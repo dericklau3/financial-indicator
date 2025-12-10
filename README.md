@@ -15,11 +15,11 @@
 - `src/components/heatmap.js`：15 年月度回报热力图（对比示例图的绿色/红色块）。
 - `src/utils/format.js`：格式化工具。
 - `src/data/sp500-monthly.js`：近 15 年每月回报（当前已替换为来自 Stooq ^spx 月度收盘价计算的回报，截止最新完成月份；如需官方数据请用你自己的源覆盖）。
-- `src/data/market-metrics.js`：市场参与度和恐慌/贪婪指标的默认值。
+- `src/data/market-metrics.js`：市场波动（VIX）和恐慌/贪婪指标的默认值。
 
 ## 数据来源（点击「更新数据」时实时抓取）
 - 标普 500 月度收盘：`https://stooq.pl/q/d/l/?s=%5Espx&i=m`（CSV），若 CORS 受限会自动尝试 `https://r.jina.ai/http://stooq.pl/q/d/l/?s=%5Espx&i=m` 与 `https://api.allorigins.win/raw?url=...` 作为代理。
-- 标普 500 20/50 日参与度：使用 S&P 广度指标 `S5TW`、`S5FI` 的收盘值（百分比），`https://stooq.pl/q/l/?s=s5tw&f=sd2t2ohlcv&h&e=csv` 与 `s5fi`，同样使用 `https://r.jina.ai/` 与 `https://api.allorigins.win/raw` 作备份代理。
+- VIX：`https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?range=5d&interval=1d`，通过 `https://api.allorigins.win/raw?url=...` 和 `https://r.jina.ai/` 代理。
 - CNN 恐慌/贪婪指数：`https://production.dataviz.cnn.io/index/fearandgreed/graphdata`，通过 `https://r.jina.ai/` 代理以便前端直接请求。
 - Crypto 恐慌/贪婪指数：`https://api.alternative.me/fng/?limit=1`，通过 `https://api.allorigins.win/raw?url=...` 代理以避免跨域限制。
 

@@ -7,7 +7,7 @@ import { Heatmap } from "./components/heatmap.js";
 
 const h = React.createElement;
 const SENTIMENT_CACHE_KEY = "sentiment-cache-v1";
-const PARTICIPATION_CACHE_KEY = "spx-participation-cache-v2";
+const VIX_CACHE_KEY = "vix-cache-v1";
 
 const todayKey = () => new Date().toISOString().slice(0, 10);
 
@@ -35,27 +35,27 @@ const saveSentimentCache = (values) => {
   }
 };
 
-const loadParticipationCache = () => {
+const loadVixCache = () => {
   try {
-    const raw = localStorage.getItem(PARTICIPATION_CACHE_KEY);
+    const raw = localStorage.getItem(VIX_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed?.date !== todayKey()) return null;
     return parsed.values;
   } catch (err) {
-    console.warn("读取参与度缓存失败", err);
+    console.warn("读取 VIX 缓存失败", err);
     return null;
   }
 };
 
-const saveParticipationCache = (values) => {
+const saveVixCache = (values) => {
   try {
     localStorage.setItem(
-      PARTICIPATION_CACHE_KEY,
+      VIX_CACHE_KEY,
       JSON.stringify({ date: todayKey(), values })
     );
   } catch (err) {
-    console.warn("写入参与度缓存失败", err);
+    console.warn("写入 VIX 缓存失败", err);
   }
 };
 
@@ -75,7 +75,7 @@ const getStreak = (returns) => {
   return `${arrow} ${count} 月`;
 };
 
-const Hero = ({ onRefresh, onUpdateSentiment, onUpdateParticipation }) =>
+const Hero = ({ onUpdateSentiment }) =>
   h(
     "header",
     { className: "hero" },
@@ -93,8 +93,6 @@ const Hero = ({ onRefresh, onUpdateSentiment, onUpdateParticipation }) =>
     h(
       "div",
       { className: "actions" },
-      h("button", { className: "ghost", onClick: onRefresh }, "Refresh View"),
-      h("button", { className: "ghost", onClick: onUpdateParticipation }, "更新参与度"),
       h("button", { className: "primary", onClick: onUpdateSentiment }, "更新恐慌/贪婪指数")
     )
   );
@@ -102,11 +100,6 @@ const Hero = ({ onRefresh, onUpdateSentiment, onUpdateParticipation }) =>
 function App() {
   const [returns, setReturns] = useState([...monthlyReturns]);
   const [metrics, setMetrics] = useState({ ...marketMetrics });
-
-  const handleRefresh = useCallback(() => {
-    setReturns((prev) => [...prev]);
-    setMetrics((prev) => ({ ...prev }));
-  }, []);
 
   useEffect(() => {
     const cached = loadSentimentCache();
@@ -124,25 +117,27 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const cached = loadParticipationCache();
+    const cached = loadVixCache();
     if (cached) {
       setMetrics((prev) => updateMetrics({ ...prev, ...cached }));
       return;
     }
-    fetchParticipationBoth()
+    fetchVix()
       .then((vals) => {
         setMetrics((prev) => updateMetrics({ ...prev, ...vals }));
       })
       .catch((err) => {
-        console.warn("自动抓取参与度失败", err);
+        console.warn("自动抓取 VIX 失败", err);
       });
   }, []);
 
   const handleUpdateSentiment = useCallback(async () => {
     try {
-      const fearGreed = await fetchFearGreed();
-      setMetrics((prev) => updateMetrics({ ...prev, ...fearGreed }));
+      const [fearGreed, vix] = await Promise.all([fetchFearGreed(), fetchVix()]);
+      const merged = { ...fearGreed, ...vix };
+      setMetrics((prev) => updateMetrics({ ...prev, ...merged }));
       saveSentimentCache(fearGreed);
+      saveVixCache(vix);
       alert("情绪指标已更新。");
     } catch (err) {
       console.error(err);
@@ -155,17 +150,6 @@ function App() {
       const latestReturns = await fetchSpxMonthlyReturns();
       setReturns(latestReturns);
       alert("月度回报已更新。");
-    } catch (err) {
-      console.error(err);
-      alert(`抓取失败：${err.message || err}`);
-    }
-  }, []);
-
-  const handleUpdateParticipation = useCallback(async () => {
-    try {
-      const vals = await fetchParticipationBoth();
-      setMetrics((prev) => updateMetrics({ ...prev, ...vals }));
-      alert("标普参与度已更新。");
     } catch (err) {
       console.error(err);
       alert(`抓取失败：${err.message || err}`);
@@ -275,35 +259,67 @@ async function fetchFearGreed() {
   return values;
 }
 
+async function fetchVix() {
+  const cached = loadVixCache();
+  if (cached) return cached;
+
+  const sources = [
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(
+      "https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?range=5d&interval=1d"
+    )}`,
+    "https://r.jina.ai/https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?range=5d&interval=1d",
+  ];
+
+  const text = await fetchTextFromSources(sources, 20);
+  const jsonStart = text.indexOf("{");
+  if (jsonStart < 0) throw new Error("VIX 数据无效");
+  const json = JSON.parse(text.slice(jsonStart));
+  const close =
+    json?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter((v) => Number.isFinite(v)).pop() ??
+    json?.chart?.result?.[0]?.meta?.regularMarketPrice;
+  if (!Number.isFinite(close)) throw new Error("VIX 数据无效");
+  const values = { vix: Number(close.toFixed(2)) };
+  saveVixCache(values);
+  return values;
+}
+
 function parseCloseFromCsv(text) {
   const lines = text
-    .trim()
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter(Boolean);
-  const headerIdx = lines.findIndex((l) => /symbol/i.test(l) && /close/i.test(l));
-  const dataIdx = headerIdx >= 0 ? headerIdx + 1 : lines.findIndex((l) => l.split(",").length >= 7);
-  if (dataIdx < 0) throw new Error("未找到数据行");
+  const csvLines = lines.filter((l) => l.includes(","));
+  const headerLine = csvLines.find((l) => /symbol/i.test(l) && /close/i.test(l));
+  const headerIdx = headerLine ? csvLines.indexOf(headerLine) : -1;
+  const headers = headerLine
+    ? headerLine.split(",").map((p) => p.trim().toLowerCase())
+    : ["symbol", "date", "time", "open", "high", "low", "close", "volume"];
 
-  const header = headerIdx >= 0 ? lines[headerIdx] : "Symbol,Date,Time,Open,High,Low,Close,Volume";
-  const headers = header.split(",").map((p) => p.trim().toLowerCase());
-  const cells = lines[dataIdx].split(",").map((p) => p.trim());
+  const dataLine =
+    headerIdx >= 0
+      ? csvLines.slice(headerIdx + 1).find((l) => l.split(",").length >= headers.length)
+      : csvLines.find((l) => l.split(",").length >= headers.length);
+
+  if (!dataLine) throw new Error("未找到数据行");
+
+  const cells = dataLine.split(",").map((p) => p.trim());
   const closeIdx = headers.findIndex((h) => h === "close");
-  const closeStr = closeIdx >= 0 ? cells[closeIdx] : cells[6];
-  const close = Number(closeStr);
+  const scrub = (val) => Number(val.replace(/[^0-9.+-]/g, ""));
+
+  const candidate = closeIdx >= 0 && cells[closeIdx] ? cells[closeIdx] : cells[cells.length - 2] || cells[cells.length - 1];
+  let close = candidate ? scrub(candidate) : NaN;
+
+  if (!Number.isFinite(close)) {
+    // Fallback: pick the last numeric cell in the row.
+    const numerics = cells.map(scrub).filter((n) => Number.isFinite(n));
+    close = numerics.length ? numerics[numerics.length - 1] : NaN;
+  }
+
   if (!Number.isFinite(close)) throw new Error("收盘价解析失败");
   return close;
 }
 
-async function fetchSpxBreadth(ticker) {
-  const lower = ticker.toLowerCase();
-  const base = `https://stooq.pl/q/l/?s=${lower}&f=sd2t2ohlcv&h&e=csv`;
-  const sources = [
-    base,
-    `https://r.jina.ai/http://stooq.pl/q/l/?s=${lower}&f=sd2t2ohlcv&h&e=csv`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(base)}`,
-  ];
-
+async function fetchTextFromSources(sources, minLength = 50) {
   let text = null;
   let lastErr = null;
   for (const url of sources) {
@@ -311,7 +327,7 @@ async function fetchSpxBreadth(ticker) {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const maybeText = await res.text();
-      if (maybeText && maybeText.length > 10) {
+      if (maybeText && maybeText.length >= minLength) {
         text = maybeText;
         break;
       }
@@ -319,35 +335,121 @@ async function fetchSpxBreadth(ticker) {
       lastErr = err;
     }
   }
-
   if (!text) {
-    throw lastErr || new Error(`获取 ${ticker} 失败`);
+    throw lastErr || new Error("未获取到文本");
+  }
+  return text;
+}
+
+async function fetchTradingViewLast(ticker) {
+  const path = `https://www.tradingview.com/symbols/${ticker}/`;
+  const sources = [
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(path)}`,
+    `https://r.jina.ai/https://${path.replace("https://", "")}`,
+    `https://r.jina.ai/http://${path.replace("https://", "")}`,
+  ];
+
+  const text = await fetchTextFromSources(sources, 50);
+
+  const lpMatch = text.match(/\"lp\":\s*([0-9]+(?:\.[0-9]+)?)/);
+  if (lpMatch) {
+    return Number(lpMatch[1]);
   }
 
-  const close = parseCloseFromCsv(text);
+  const priceMatch =
+    text.match(/\"regularMarketPrice\":\s*([0-9]+(?:\.[0-9]+)?)/) ||
+    text.match(/\"last\"\s*:\s*([0-9]+(?:\.[0-9]+)?)/) ||
+    text.match(/\"price\"\s*:\s*([0-9]+(?:\.[0-9]+)?)/);
+  if (priceMatch) {
+    return Number(priceMatch[1]);
+  }
+
+  // Fallback: attempt to parse via CSV if response accidentally a CSV from proxy.
+  try {
+    const close = parseCloseFromCsv(text);
+    return close;
+  } catch (e) {
+    throw new Error("未解析到最新价");
+  }
+}
+
+async function fetchTradingViewScanner(tickers) {
+  const payload = JSON.stringify({
+    symbols: { tickers, query: { types: [] } },
+    columns: ["close"],
+  });
+
+  const endpoints = [
+    "https://scanner.tradingview.com/america/scan",
+    "https://cors.isomorphic-git.org/https://scanner.tradingview.com/america/scan",
+    "https://thingproxy.freeboard.io/fetch/https://scanner.tradingview.com/america/scan",
+  ];
+
+  let lastErr = null;
+  for (const url of endpoints) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Referer: "https://www.tradingview.com",
+          Origin: "https://www.tradingview.com",
+        },
+        body: payload,
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if (!json?.data?.length) throw new Error("TradingView 扫描器无数据");
+
+      const map = {};
+      json.data.forEach((item) => {
+        const symbol = item?.s;
+        const [close] = item?.d || [];
+        if (symbol && Number.isFinite(close)) {
+          map[symbol] = close;
+        }
+      });
+
+      if (Object.keys(map).length) return map;
+      throw new Error("TradingView 扫描器未返回价格");
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+
+  throw lastErr || new Error("TradingView 扫描器请求失败");
+}
+
+async function fetchYahooBreadth(symbol) {
+  const base = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5d&interval=1d`;
+  const sources = [
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(base)}`,
+    `https://r.jina.ai/https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
+      symbol
+    )}?range=5d&interval=1d`,
+  ];
+
+  const text = await fetchTextFromSources(sources, 20);
+  const jsonStart = text.indexOf("{");
+  if (jsonStart < 0) throw new Error("Yahoo 数据无效");
+  const json = JSON.parse(text.slice(jsonStart));
+  const close =
+    json?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter((v) => Number.isFinite(v)).pop() ??
+    json?.chart?.result?.[0]?.meta?.regularMarketPrice;
+  if (!Number.isFinite(close)) throw new Error("Yahoo 数据无效");
   return Math.round(close);
 }
 
 async function fetchParticipationBoth() {
-  const cached = loadParticipationCache();
-  if (cached) return cached;
-
-  const [d20, d50] = await Promise.all([fetchSpxBreadth("s5tw"), fetchSpxBreadth("s5fi")]);
-  const values = {
-    spParticipation20: d20,
-    spParticipation50: d50,
-  };
-  saveParticipationCache(values);
-  return values;
+  // kept for backward compatibility; participation指标已下线
+  throw new Error("参与度已下线");
 }
 
   return h(
     "div",
     { className: "page" },
     h(Hero, {
-      onRefresh: handleRefresh,
       onUpdateSentiment: handleUpdateSentiment,
-      onUpdateParticipation: handleUpdateParticipation,
     }),
     h(Metrics, { metrics }),
     h(Heatmap, { data: returns, onUpdate: handleUpdateReturns })
