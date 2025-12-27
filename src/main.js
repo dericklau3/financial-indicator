@@ -4,10 +4,10 @@ import { monthlyReturns, upsertMonthlyReturn } from "./data/sp500-monthly.js";
 import { marketMetrics, updateMetrics } from "./data/market-metrics.js";
 import { Metrics } from "./components/metrics.js";
 import { Heatmap } from "./components/heatmap.js";
+import { Calculator } from "./components/calculator.js";
 
 const h = React.createElement;
 const SENTIMENT_CACHE_KEY = "sentiment-cache-v1";
-const VIX_CACHE_KEY = "vix-cache-v1";
 
 const todayKey = () => new Date().toISOString().slice(0, 10);
 
@@ -16,8 +16,7 @@ const loadSentimentCache = () => {
     const raw = localStorage.getItem(SENTIMENT_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (parsed?.date !== todayKey()) return null;
-    return parsed.values;
+    return parsed?.values ? { date: parsed?.date, values: parsed.values } : null;
   } catch (err) {
     console.warn("读取情绪缓存失败", err);
     return null;
@@ -32,30 +31,6 @@ const saveSentimentCache = (values) => {
     );
   } catch (err) {
     console.warn("写入情绪缓存失败", err);
-  }
-};
-
-const loadVixCache = () => {
-  try {
-    const raw = localStorage.getItem(VIX_CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed?.date !== todayKey()) return null;
-    return parsed.values;
-  } catch (err) {
-    console.warn("读取 VIX 缓存失败", err);
-    return null;
-  }
-};
-
-const saveVixCache = (values) => {
-  try {
-    localStorage.setItem(
-      VIX_CACHE_KEY,
-      JSON.stringify({ date: todayKey(), values })
-    );
-  } catch (err) {
-    console.warn("写入 VIX 缓存失败", err);
   }
 };
 
@@ -75,7 +50,7 @@ const getStreak = (returns) => {
   return `${arrow} ${count} 月`;
 };
 
-const Hero = ({ onUpdateSentiment }) =>
+const Hero = () =>
   h(
     "header",
     { className: "hero" },
@@ -90,59 +65,23 @@ const Hero = ({ onUpdateSentiment }) =>
         h("h1", null, "US Equity & Macro Pulse")
       )
     ),
-    h(
-      "div",
-      { className: "actions" },
-      h("button", { className: "primary", onClick: onUpdateSentiment }, "更新恐慌/贪婪指数")
-    )
+    h("div", { className: "actions" })
   );
 
 function App() {
   const [returns, setReturns] = useState([...monthlyReturns]);
   const [metrics, setMetrics] = useState({ ...marketMetrics });
+  const [view, setView] = useState("dashboard");
+
+  const hasFullSentiment = (values) =>
+    typeof values?.vix === "number" &&
+    typeof values?.cnnFearGreed === "number" &&
+    typeof values?.cryptoFearGreed === "number";
 
   useEffect(() => {
-    const cached = loadSentimentCache();
-    if (cached) {
-      setMetrics((prev) => updateMetrics({ ...prev, ...cached }));
-      return;
-    }
-    fetchFearGreed()
-      .then((vals) => {
-        setMetrics((prev) => updateMetrics({ ...prev, ...vals }));
-      })
-      .catch((err) => {
-        console.warn("自动抓取情绪指标失败", err);
-      });
-  }, []);
-
-  useEffect(() => {
-    const cached = loadVixCache();
-    if (cached) {
-      setMetrics((prev) => updateMetrics({ ...prev, ...cached }));
-      return;
-    }
-    fetchVix()
-      .then((vals) => {
-        setMetrics((prev) => updateMetrics({ ...prev, ...vals }));
-      })
-      .catch((err) => {
-        console.warn("自动抓取 VIX 失败", err);
-      });
-  }, []);
-
-  const handleUpdateSentiment = useCallback(async () => {
-    try {
-      const [fearGreed, vix] = await Promise.all([fetchFearGreed(), fetchVix()]);
-      const merged = { ...fearGreed, ...vix };
-      setMetrics((prev) => updateMetrics({ ...prev, ...merged }));
-      saveSentimentCache(fearGreed);
-      saveVixCache(vix);
-      alert("情绪指标已更新。");
-    } catch (err) {
-      console.error(err);
-      alert(`抓取失败：${err.message || err}`);
-    }
+    refreshSentiment().catch((err) => {
+      console.warn("自动抓取情绪指标失败", err);
+    });
   }, []);
 
   const handleUpdateReturns = useCallback(async () => {
@@ -155,6 +94,28 @@ function App() {
       alert(`抓取失败：${err.message || err}`);
     }
   }, []);
+
+  async function refreshSentiment({ force = false } = {}) {
+    const cached = force ? null : loadSentimentCache();
+    const cachedValues = cached?.values;
+    const cachedIsFresh = cached?.date === todayKey();
+
+    if (cachedValues && hasFullSentiment(cachedValues)) {
+      setMetrics((prev) => updateMetrics({ ...prev, ...cachedValues }));
+      if (cachedIsFresh) return cachedValues;
+    }
+
+    if (cachedValues && !hasFullSentiment(cachedValues)) {
+      // Render any cached subset first to reduce perceived latency.
+      setMetrics((prev) => updateMetrics({ ...prev, ...cachedValues }));
+    }
+
+    const [fearGreed, vix] = await Promise.all([fetchFearGreed(), fetchVix()]);
+    const merged = { ...fearGreed, ...vix };
+    saveSentimentCache(merged);
+    setMetrics((prev) => updateMetrics({ ...prev, ...merged }));
+    return merged;
+  }
 
 async function fetchSpxMonthlyReturns() {
   const sources = [
@@ -225,11 +186,6 @@ async function fetchSpxMonthlyReturns() {
 }
 
 async function fetchFearGreed() {
-  const cached = loadSentimentCache();
-  if (cached) {
-    return cached;
-  }
-
   const cnnUrl = "https://r.jina.ai/https://production.dataviz.cnn.io/index/fearandgreed/graphdata";
   const cryptoUrl = "https://api.allorigins.win/raw?url=https://api.alternative.me/fng/?limit=1";
 
@@ -255,14 +211,10 @@ async function fetchFearGreed() {
     cryptoFearGreed: Number.isFinite(cryptoScore) ? Math.round(cryptoScore) : undefined,
   };
 
-  saveSentimentCache(values);
   return values;
 }
 
 async function fetchVix() {
-  const cached = loadVixCache();
-  if (cached) return cached;
-
   const sources = [
     `https://api.allorigins.win/raw?url=${encodeURIComponent(
       "https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?range=5d&interval=1d"
@@ -279,7 +231,6 @@ async function fetchVix() {
     json?.chart?.result?.[0]?.meta?.regularMarketPrice;
   if (!Number.isFinite(close)) throw new Error("VIX 数据无效");
   const values = { vix: Number(close.toFixed(2)) };
-  saveVixCache(values);
   return values;
 }
 
@@ -440,19 +391,64 @@ async function fetchYahooBreadth(symbol) {
   return Math.round(close);
 }
 
-async function fetchParticipationBoth() {
-  // kept for backward compatibility; participation指标已下线
-  throw new Error("参与度已下线");
-}
+  async function fetchParticipationBoth() {
+    // kept for backward compatibility; participation指标已下线
+    throw new Error("参与度已下线");
+  }
+
+  const navItems = [
+    { id: "dashboard", label: "Dashboard", desc: "宏观热力图" },
+    { id: "calculator", label: "计算器", desc: "价格波动 / 卖权" },
+  ];
+
+  const renderDashboard = () =>
+    h(
+      React.Fragment,
+      null,
+      h(Hero),
+      h(Metrics, { metrics }),
+      h(Heatmap, { data: returns, onUpdate: handleUpdateReturns })
+    );
 
   return h(
     "div",
-    { className: "page" },
-    h(Hero, {
-      onUpdateSentiment: handleUpdateSentiment,
-    }),
-    h(Metrics, { metrics }),
-    h(Heatmap, { data: returns, onUpdate: handleUpdateReturns })
+    { className: "app-shell" },
+    h(
+      "aside",
+      { className: "sidebar" },
+      h(
+        "div",
+        { className: "sidebar__brand" },
+        h("div", { className: "dot" }),
+        h("div", null, h("p", { className: "eyebrow" }, "Market Pulse"), h("h2", null, "Radar"))
+      ),
+      h(
+        "nav",
+        { className: "sidebar__nav" },
+        navItems.map((item) =>
+          h(
+            "button",
+            {
+              key: item.id,
+              className: `sidebar__link ${view === item.id ? "active" : ""}`,
+              onClick: () => setView(item.id),
+            },
+            h("div", { className: "sidebar__link__title" }, item.label),
+            h("p", { className: "sidebar__link__desc" }, item.desc)
+          )
+        )
+      ),
+      h(
+        "div",
+        { className: "sidebar__foot" },
+        h("span", { className: "pill" }, "每日刷新 · 实时情绪")
+      )
+    ),
+    h(
+      "main",
+      { className: "content" },
+      h("div", { className: "page" }, view === "dashboard" ? renderDashboard() : h(Calculator))
+    )
   );
 }
 
