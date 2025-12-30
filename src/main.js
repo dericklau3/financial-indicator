@@ -50,7 +50,7 @@ const getStreak = (returns) => {
   return `${arrow} ${count} 月`;
 };
 
-const Hero = () =>
+const Hero = ({ onRefreshSentiment, sentimentLoading }) =>
   h(
     "header",
     { className: "hero" },
@@ -65,13 +65,26 @@ const Hero = () =>
         h("h1", null, "US Equity & Macro Pulse")
       )
     ),
-    h("div", { className: "actions" })
+    h(
+      "div",
+      { className: "actions" },
+      h(
+        "button",
+        {
+          className: "ghost",
+          onClick: onRefreshSentiment,
+          disabled: sentimentLoading,
+        },
+        sentimentLoading ? "更新中…" : "更新情绪指数"
+      )
+    )
   );
 
 function App() {
   const [returns, setReturns] = useState([...monthlyReturns]);
   const [metrics, setMetrics] = useState({ ...marketMetrics });
   const [view, setView] = useState("dashboard");
+  const [sentimentLoading, setSentimentLoading] = useState(false);
 
   const hasFullSentiment = (values) =>
     typeof values?.vix === "number" &&
@@ -92,6 +105,18 @@ function App() {
     } catch (err) {
       console.error(err);
       alert(`抓取失败：${err.message || err}`);
+    }
+  }, []);
+
+  const handleRefreshSentiment = useCallback(async () => {
+    setSentimentLoading(true);
+    try {
+      await refreshSentiment({ force: true });
+    } catch (err) {
+      console.error(err);
+      alert(`情绪指数更新失败：${err.message || err}`);
+    } finally {
+      setSentimentLoading(false);
     }
   }, []);
 
@@ -396,19 +421,75 @@ async function fetchYahooBreadth(symbol) {
     throw new Error("参与度已下线");
   }
 
+  const investorLinks = [
+    {
+      id: "duanyongping",
+      name: "段永平",
+      desc: "H&H Holdings 持仓",
+      url: "https://www.dataroma.com/m/holdings.php?m=HH",
+    },
+    {
+      id: "buffett",
+      name: "巴菲特",
+      desc: "Berkshire Hathaway 持仓",
+      url: "https://www.dataroma.com/m/holdings.php?m=BRK",
+    },
+    {
+      id: "ark",
+      name: "ARK",
+      desc: "ARK Investment Management 持仓",
+      url: "https://hedgefollow.com/funds/ARK+Investment+Management",
+    },
+  ];
+
   const navItems = [
     { id: "dashboard", label: "Dashboard", desc: "宏观热力图" },
     { id: "calculator", label: "计算器", desc: "价格波动 / 卖权" },
+    { id: "investors", label: "名人持仓", desc: "名人持仓" },
   ];
 
   const renderDashboard = () =>
     h(
       React.Fragment,
       null,
-      h(Hero),
+      h(Hero, { onRefreshSentiment: handleRefreshSentiment, sentimentLoading }),
       h(Metrics, { metrics }),
       h(Heatmap, { data: returns, onUpdate: handleUpdateReturns })
     );
+
+  const renderInvestors = () =>
+    h(
+      "section",
+      { className: "investor-page" },
+      h("p", { className: "eyebrow" }, "Investor Radar"),
+      h("h2", null, "名人持仓跟踪"),
+      h(
+        "div",
+        { className: "investor-grid" },
+        investorLinks.map((item) =>
+          h(
+            "a",
+            {
+              key: item.id,
+              className: "investor-card",
+              href: item.url,
+              target: "_blank",
+              rel: "noreferrer",
+            },
+            h("div", { className: "investor-card__title" }, item.name),
+            h("p", { className: "investor-card__desc" }, item.desc),
+            h("span", { className: "investor-card__cta" }, "查看持仓 →")
+          )
+        )
+      )
+    );
+
+  const renderPage = () => {
+    if (view === "dashboard") return renderDashboard();
+    if (view === "calculator") return h(Calculator);
+    if (view === "investors") return renderInvestors();
+    return null;
+  };
 
   return h(
     "div",
@@ -447,7 +528,7 @@ async function fetchYahooBreadth(symbol) {
     h(
       "main",
       { className: "content" },
-      h("div", { className: "page" }, view === "dashboard" ? renderDashboard() : h(Calculator))
+      h("div", { className: "page" }, renderPage())
     )
   );
 }
