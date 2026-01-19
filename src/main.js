@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { createRoot } from "react-dom/client";
-import { monthlyReturns, upsertMonthlyReturn } from "./data/sp500-monthly.js";
+import { loadMonthlyReturns, saveMonthlyReturns } from "./data/sp500-monthly.js";
 import { marketMetrics, updateMetrics } from "./data/market-metrics.js";
 import { Metrics } from "./components/metrics.js";
 import { Heatmap } from "./components/heatmap.js";
@@ -81,7 +81,7 @@ const Hero = ({ onRefreshSentiment, sentimentLoading }) =>
   );
 
 function App() {
-  const [returns, setReturns] = useState([...monthlyReturns]);
+  const [returns, setReturns] = useState(() => loadMonthlyReturns());
   const [metrics, setMetrics] = useState({ ...marketMetrics });
   const [view, setView] = useState("dashboard");
   const [sentimentLoading, setSentimentLoading] = useState(false);
@@ -101,6 +101,7 @@ function App() {
     try {
       const latestReturns = await fetchSpxMonthlyReturns();
       setReturns(latestReturns);
+      saveMonthlyReturns(latestReturns);
       alert("月度回报已更新。");
     } catch (err) {
       console.error(err);

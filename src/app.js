@@ -1,4 +1,4 @@
-import { monthlyReturns, upsertMonthlyReturn } from "./data/sp500-monthly.js";
+import { loadMonthlyReturns, upsertMonthlyReturn } from "./data/sp500-monthly.js";
 import { marketMetrics, updateMetrics } from "./data/market-metrics.js";
 import { renderMetrics } from "./components/metrics.js";
 import {
@@ -8,7 +8,7 @@ import {
 import { formatPct, formatMonth } from "./utils/format.js";
 
 const state = {
-  returns: [...monthlyReturns],
+  returns: loadMonthlyReturns(),
   metrics: { ...marketMetrics },
 };
 

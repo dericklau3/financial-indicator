@@ -1,6 +1,8 @@
 // S&P 500 monthly total returns (approx.) derived from Stooq (^spx) monthly
 // closes. Period: last 15 years up to the last completed month at generation
 // time. Replace with your own official data source if needed.
+const RETURNS_CACHE_KEY = "sp500-monthly-returns-v1";
+
 export const monthlyReturns = [
   { "month": "2010-12", "returnPct": 6.53 },
   { "month": "2011-01", "returnPct": 2.26 },
@@ -184,6 +186,68 @@ export const monthlyReturns = [
   { "month": "2025-11", "returnPct": 0.13 }
 ];
 
+const canUseStorage = () =>
+  typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+
+const isValidMonth = (value) =>
+  typeof value === "string" && /^\d{4}-\d{2}$/.test(value);
+
+const normalizeMonthlyReturns = (input) => {
+  if (!Array.isArray(input)) return null;
+  const cleaned = input
+    .filter(
+      (item) =>
+        item &&
+        isValidMonth(item.month) &&
+        Number.isFinite(item.returnPct)
+    )
+    .map((item) => ({
+      month: item.month,
+      returnPct: Number(item.returnPct),
+    }));
+  if (!cleaned.length) return null;
+  cleaned.sort((a, b) => (a.month > b.month ? 1 : -1));
+  return cleaned;
+};
+
+const setMonthlyReturns = (values) => {
+  monthlyReturns.length = 0;
+  monthlyReturns.push(...values);
+};
+
+export function loadMonthlyReturns() {
+  if (!canUseStorage()) return [...monthlyReturns];
+  try {
+    const raw = localStorage.getItem(RETURNS_CACHE_KEY);
+    if (!raw) {
+      saveMonthlyReturns(monthlyReturns);
+      return [...monthlyReturns];
+    }
+    const parsed = JSON.parse(raw);
+    const normalized = normalizeMonthlyReturns(parsed);
+    if (normalized) {
+      setMonthlyReturns(normalized);
+      return [...monthlyReturns];
+    }
+  } catch (err) {
+    console.warn("读取月度回报缓存失败", err);
+  }
+  saveMonthlyReturns(monthlyReturns);
+  return [...monthlyReturns];
+}
+
+export function saveMonthlyReturns(returns) {
+  const normalized = normalizeMonthlyReturns(returns);
+  if (!normalized) return;
+  setMonthlyReturns(normalized);
+  if (!canUseStorage()) return;
+  try {
+    localStorage.setItem(RETURNS_CACHE_KEY, JSON.stringify(normalized));
+  } catch (err) {
+    console.warn("写入月度回报缓存失败", err);
+  }
+}
+
 export function upsertMonthlyReturn(month, returnPct) {
   const idx = monthlyReturns.findIndex((m) => m.month === month);
   if (idx >= 0) {
@@ -192,5 +256,6 @@ export function upsertMonthlyReturn(month, returnPct) {
     monthlyReturns.push({ month, returnPct });
     monthlyReturns.sort((a, b) => (a.month > b.month ? 1 : -1));
   }
+  saveMonthlyReturns(monthlyReturns);
   return [...monthlyReturns];
 }
