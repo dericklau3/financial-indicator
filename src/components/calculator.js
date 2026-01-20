@@ -86,7 +86,7 @@ const PctRow = ({
   );
 
 export function Calculator() {
-  const [buyPrice, setBuyPrice] = React.useState(100);
+  const [buyPriceInput, setBuyPriceInput] = React.useState("100");
   const [upPct, setUpPct] = React.useState(8);
   const [downPct, setDownPct] = React.useState(6);
   const [upPctInput, setUpPctInput] = React.useState("8");
@@ -97,20 +97,33 @@ export function Calculator() {
   const [editingDownPct, setEditingDownPct] = React.useState(false);
   const [editingUpPrice, setEditingUpPrice] = React.useState(false);
   const [editingDownPrice, setEditingDownPrice] = React.useState(false);
-  const [strike, setStrike] = React.useState(225);
-  const [premium, setPremium] = React.useState(3.2);
-  const [contracts, setContracts] = React.useState(1);
+  const [strikeInput, setStrikeInput] = React.useState("225");
+  const [premiumInput, setPremiumInput] = React.useState("3.2");
+  const [contractsInput, setContractsInput] = React.useState("1");
+  const [budgetInput, setBudgetInput] = React.useState("10000");
+  const [sharePriceInput, setSharePriceInput] = React.useState("150");
 
   const toNumber = (val, fallback) => {
     const n = Number(val);
     return Number.isFinite(n) ? n : fallback;
   };
 
+  const buyPrice = Math.max(0, toNumber(buyPriceInput, 0));
+  const strike = Math.max(0, toNumber(strikeInput, 0));
+  const premium = Math.max(0, toNumber(premiumInput, 0));
+  const contracts = Math.max(1, Math.round(toNumber(contractsInput, 1)));
+  const budget = Math.max(0, toNumber(budgetInput, 0));
+  const sharePrice = Math.max(0, toNumber(sharePriceInput, 0));
+
   const upPrice = buyPrice * (1 + upPct / 100);
   const downPrice = buyPrice * (1 - downPct / 100);
   const netCostPerShare = strike - premium;
   const premiumTotal = premium * 100 * contracts;
   const assignmentCost = netCostPerShare * 100 * contracts;
+  const shareCount =
+    sharePrice > 0 ? Math.max(0, Math.floor(budget / sharePrice)) : 0;
+  const remainingCash =
+    sharePrice > 0 ? Math.max(0, budget - shareCount * sharePrice) : 0;
 
   React.useEffect(() => {
     if (!editingUpPct) setUpPctInput(String(upPct));
@@ -162,10 +175,10 @@ export function Calculator() {
             h("span", { className: "prefix" }, "$"),
             h("input", {
               type: "number",
-              value: buyPrice,
+              value: buyPriceInput,
               min: 0,
               step: "0.01",
-              onChange: (e) => setBuyPrice(toNumber(e.target.value, buyPrice)),
+              onChange: (e) => setBuyPriceInput(e.target.value),
             })
           )
       ),
@@ -230,6 +243,68 @@ export function Calculator() {
         h(
           "header",
           { className: "calc-card__header" },
+          h("h3", null, "可买股数计算"),
+          h("p", { className: "muted" }, "输入金额与股价，快速估算可买数量")
+        ),
+        h(
+          "div",
+          { className: "double-field" },
+          h(
+            "div",
+            { className: "field" },
+            h("label", null, "投入金额"),
+            h("div", { className: "field__row" },
+              h("span", { className: "prefix" }, "$"),
+              h("input", {
+                type: "number",
+                value: budgetInput,
+                min: 0,
+                step: "0.01",
+                onChange: (e) => setBudgetInput(e.target.value),
+              })
+            )
+          ),
+          h(
+            "div",
+            { className: "field" },
+            h("label", null, "当前股价"),
+            h("div", { className: "field__row" },
+              h("span", { className: "prefix" }, "$"),
+              h("input", {
+                type: "number",
+                value: sharePriceInput,
+                min: 0,
+                step: "0.01",
+                onChange: (e) => setSharePriceInput(e.target.value),
+              })
+            )
+          )
+        ),
+        h(
+          "div",
+          { className: "result-cards" },
+          h(
+            "div",
+            { className: "result-card" },
+            h("p", { className: "label" }, "可买股数"),
+            h("div", { className: "metric--lg" }, `${shareCount}`),
+            h("p", { className: "muted" }, "按整数股数估算")
+          ),
+          h(
+            "div",
+            { className: "result-card" },
+            h("p", { className: "label" }, "剩余资金"),
+            h("div", { className: "metric--lg" }, `$${formatCurrency(remainingCash)}`),
+            h("p", { className: "muted" }, "金额 - 股数 × 股价")
+          )
+        )
+      ),
+      h(
+        "div",
+        { className: "calc-card" },
+        h(
+          "header",
+          { className: "calc-card__header" },
           h("h3", null, "Sell Put 成交均价"),
           h("p", { className: "muted" }, "设定行权价与收到的权利金，查看真实持仓成本")
         ),
@@ -244,10 +319,10 @@ export function Calculator() {
               h("span", { className: "prefix" }, "$"),
               h("input", {
                 type: "number",
-                value: strike,
+                value: strikeInput,
                 min: 0,
                 step: "0.5",
-                onChange: (e) => setStrike(toNumber(e.target.value, strike)),
+                onChange: (e) => setStrikeInput(e.target.value),
               })
             )
           ),
@@ -259,10 +334,10 @@ export function Calculator() {
               h("span", { className: "prefix" }, "$"),
               h("input", {
                 type: "number",
-                value: premium,
+                value: premiumInput,
                 min: 0,
                 step: "0.1",
-                onChange: (e) => setPremium(toNumber(e.target.value, premium)),
+                onChange: (e) => setPremiumInput(e.target.value),
               })
             )
           )
@@ -275,10 +350,10 @@ export function Calculator() {
             h("span", { className: "prefix" }, "#"),
             h("input", {
               type: "number",
-              value: contracts,
+              value: contractsInput,
               min: 1,
               step: "1",
-              onChange: (e) => setContracts(Math.max(1, Math.round(toNumber(e.target.value, contracts)))),
+              onChange: (e) => setContractsInput(e.target.value),
             })
           )
         ),
