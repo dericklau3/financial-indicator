@@ -10,6 +10,40 @@ const h = React.createElement;
 const SENTIMENT_CACHE_KEY = "sentiment-cache-v1";
 
 const todayKey = () => new Date().toISOString().slice(0, 10);
+const toDateKey = (date) => date.toISOString().slice(0, 10);
+
+const normalizeDateValue = (value) => {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "number") {
+    const millis = value > 1e12 ? value : value > 1e9 ? value * 1000 : NaN;
+    if (!Number.isFinite(millis)) return null;
+    const dt = new Date(millis);
+    return Number.isNaN(dt.getTime()) ? null : toDateKey(dt);
+  }
+  if (typeof value === "string" && value.trim()) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) {
+      return normalizeDateValue(numeric);
+    }
+    const dt = new Date(value);
+    return Number.isNaN(dt.getTime()) ? null : toDateKey(dt);
+  }
+  return null;
+};
+
+const pickLastDateFromSeries = (series) => {
+  if (!Array.isArray(series) || !series.length) return null;
+  const last = series[series.length - 1];
+  if (typeof last === "object" && last !== null) {
+    return (
+      normalizeDateValue(last.x) ||
+      normalizeDateValue(last.timestamp) ||
+      normalizeDateValue(last.date) ||
+      normalizeDateValue(last.time)
+    );
+  }
+  return normalizeDateValue(last);
+};
 
 const loadSentimentCache = () => {
   try {
@@ -79,6 +113,23 @@ const Hero = ({ onRefreshSentiment, sentimentLoading }) =>
       )
     )
   );
+
+const SentimentDates = ({ metrics }) => {
+  const vixDate = metrics?.vixDate || null;
+  const cnnDate = metrics?.cnnFearGreedDate || null;
+  const latestDate =
+    vixDate && cnnDate
+      ? vixDate >= cnnDate
+        ? vixDate
+        : cnnDate
+      : vixDate || cnnDate || "--";
+  return h(
+    "div",
+    { className: "sentiment-date" },
+    h("span", { className: "sentiment-date__label" }, "数据日期"),
+    h("span", { className: "sentiment-date__value" }, latestDate)
+  );
+};
 
 function App() {
   const [returns, setReturns] = useState(() => loadMonthlyReturns());
@@ -231,10 +282,20 @@ async function fetchFearGreed() {
   const cnn = JSON.parse(cnnText.slice(start));
   const cnnScore = Number(cnn?.fear_and_greed?.score);
   const cryptoScore = Number(cryptoJson?.data?.[0]?.value);
+  const cnnDate =
+    normalizeDateValue(cnn?.fear_and_greed?.timestamp) ||
+    normalizeDateValue(cnn?.fear_and_greed?.time) ||
+    normalizeDateValue(cnn?.fear_and_greed?.date) ||
+    normalizeDateValue(cnn?.fear_and_greed?.last_updated) ||
+    normalizeDateValue(cnn?.fear_and_greed?.lastUpdated) ||
+    normalizeDateValue(cnn?.fear_and_greed?.updated) ||
+    pickLastDateFromSeries(cnn?.fear_and_greed_historical?.data) ||
+    pickLastDateFromSeries(cnn?.fear_and_greed_history?.data);
 
   const values = {
     cnnFearGreed: Number.isFinite(cnnScore) ? Math.round(cnnScore) : undefined,
     cryptoFearGreed: Number.isFinite(cryptoScore) ? Math.round(cryptoScore) : undefined,
+    ...(cnnDate ? { cnnFearGreedDate: cnnDate } : null),
   };
 
   return values;
@@ -256,7 +317,14 @@ async function fetchVix() {
     json?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter((v) => Number.isFinite(v)).pop() ??
     json?.chart?.result?.[0]?.meta?.regularMarketPrice;
   if (!Number.isFinite(close)) throw new Error("VIX 数据无效");
-  const values = { vix: Number(close.toFixed(2)) };
+  const vixTimestamp =
+    json?.chart?.result?.[0]?.timestamp?.filter((t) => Number.isFinite(t)).pop() ??
+    json?.chart?.result?.[0]?.meta?.regularMarketTime;
+  const vixDate = normalizeDateValue(vixTimestamp);
+  const values = {
+    vix: Number(close.toFixed(2)),
+    ...(vixDate ? { vixDate } : null),
+  };
   return values;
 }
 
@@ -454,6 +522,7 @@ async function fetchYahooBreadth(symbol) {
       React.Fragment,
       null,
       h(Hero, { onRefreshSentiment: handleRefreshSentiment, sentimentLoading }),
+      h(SentimentDates, { metrics }),
       h(Metrics, { metrics }),
       h(Heatmap, { data: returns, onUpdate: handleUpdateReturns })
     );

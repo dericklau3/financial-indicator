@@ -28,17 +28,17 @@
 
 ### 安装依赖
 ```bash
-npm install
+yarn install
 ```
 
 ### 本地开发
 ```bash
-npm run dev
+yarn dev
 ```
 默认会在 `http://localhost:5173` 提供热更新开发服务。
 
 ### 生产构建
 ```bash
-npm run build
-npm run preview  # 预览构建产物
+yarn build
+yarn preview  # 预览构建产物
 ```

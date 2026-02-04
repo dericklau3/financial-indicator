@@ -167,6 +167,32 @@ body {
   box-shadow: var(--shadow);
 }
 
+.sentiment-date {
+  margin-top: 12px;
+  padding: 10px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(15, 21, 44, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  box-shadow: var(--shadow);
+}
+
+.sentiment-date__label {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sentiment-date__value {
+  font-size: 14px;
+  color: var(--text);
+  font-weight: 600;
+}
+
 .brand {
   display: flex;
   align-items: center;
