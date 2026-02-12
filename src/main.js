@@ -509,6 +509,12 @@ async function fetchYahooBreadth(symbol) {
       desc: "ARK Investment Management 持仓",
       url: "https://hedgefollow.com/funds/ARK+Investment+Management",
     },
+    {
+      id: "arkk",
+      name: "ARKK",
+      desc: "ARK Innovation ETF 持仓",
+      url: "https://www.ark-funds.com/funds/arkk#hold",
+    },
   ];
 
   const navItems = [
