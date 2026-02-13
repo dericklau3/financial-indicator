@@ -4,6 +4,7 @@ export const marketMetrics = {
   cryptoFearGreed: 48,
   vixDate: null,
   cnnFearGreedDate: null,
+  cryptoFearGreedDate: null,
 };
 
 /**
@@ -24,6 +25,9 @@ export function updateMetrics(next) {
   }
   if (typeof next.cnnFearGreedDate === "string") {
     marketMetrics.cnnFearGreedDate = next.cnnFearGreedDate;
+  }
+  if (typeof next.cryptoFearGreedDate === "string") {
+    marketMetrics.cryptoFearGreedDate = next.cryptoFearGreedDate;
   }
   return { ...marketMetrics };
 }

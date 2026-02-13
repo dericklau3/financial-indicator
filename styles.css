@@ -281,6 +281,16 @@ button.ghost {
   font-size: 13px;
 }
 
+.metric-card__source-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.metric-card__source-link:hover {
+  color: var(--accent);
+}
+
 .metric-card__value {
   font-size: 26px;
   margin-top: 6px;

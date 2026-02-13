@@ -115,14 +115,11 @@ const Hero = ({ onRefreshSentiment, sentimentLoading }) =>
   );
 
 const SentimentDates = ({ metrics }) => {
-  const vixDate = metrics?.vixDate || null;
-  const cnnDate = metrics?.cnnFearGreedDate || null;
   const latestDate =
-    vixDate && cnnDate
-      ? vixDate >= cnnDate
-        ? vixDate
-        : cnnDate
-      : vixDate || cnnDate || "--";
+    [metrics?.vixDate, metrics?.cnnFearGreedDate, metrics?.cryptoFearGreedDate]
+      .filter((d) => typeof d === "string" && d.length)
+      .sort()
+      .pop() || "--";
   return h(
     "div",
     { className: "sentiment-date" },
@@ -175,11 +172,9 @@ function App() {
   async function refreshSentiment({ force = false } = {}) {
     const cached = force ? null : loadSentimentCache();
     const cachedValues = cached?.values;
-    const cachedIsFresh = cached?.date === todayKey();
 
     if (cachedValues && hasFullSentiment(cachedValues)) {
       setMetrics((prev) => updateMetrics({ ...prev, ...cachedValues }));
-      if (cachedIsFresh) return cachedValues;
     }
 
     if (cachedValues && !hasFullSentiment(cachedValues)) {
@@ -187,11 +182,16 @@ function App() {
       setMetrics((prev) => updateMetrics({ ...prev, ...cachedValues }));
     }
 
-    const [fearGreed, vix] = await Promise.all([fetchFearGreed(), fetchVix()]);
-    const merged = { ...fearGreed, ...vix };
-    saveSentimentCache(merged);
-    setMetrics((prev) => updateMetrics({ ...prev, ...merged }));
-    return merged;
+    try {
+      const [fearGreed, vix] = await Promise.all([fetchFearGreed(), fetchVix()]);
+      const merged = { ...fearGreed, ...vix };
+      saveSentimentCache(merged);
+      setMetrics((prev) => updateMetrics({ ...prev, ...merged }));
+      return merged;
+    } catch (err) {
+      if (cachedValues) return cachedValues;
+      throw err;
+    }
   }
 
 async function fetchSpxMonthlyReturns() {
@@ -264,24 +264,34 @@ async function fetchSpxMonthlyReturns() {
 
 async function fetchFearGreed() {
   const cnnUrl = "https://r.jina.ai/https://production.dataviz.cnn.io/index/fearandgreed/graphdata";
-  const cryptoUrl = "https://api.allorigins.win/raw?url=https://api.alternative.me/fng/?limit=1";
+  const cryptoSources = [
+    `https://api.alternative.me/fng/?limit=1&ts=${Date.now()}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(
+      `https://api.alternative.me/fng/?limit=1&ts=${Date.now()}`
+    )}`,
+    "https://r.jina.ai/https://api.alternative.me/fng/?limit=1",
+  ];
 
-  const [cnnText, cryptoJson] = await Promise.all([
+  const [cnnText, cryptoText] = await Promise.all([
     fetch(cnnUrl).then((r) => {
       if (!r.ok) throw new Error(`CNN指数请求失败 ${r.status}`);
       return r.text();
     }),
-    fetch(cryptoUrl).then((r) => {
-      if (!r.ok) throw new Error(`Crypto指数请求失败 ${r.status}`);
-      return r.json();
-    }),
+    fetchTextFromSources(cryptoSources, 20),
   ]);
 
   const start = cnnText.indexOf("{");
   if (start < 0) throw new Error("CNN 指数解析失败");
   const cnn = JSON.parse(cnnText.slice(start));
+  const cryptoStart = cryptoText.indexOf("{");
+  if (cryptoStart < 0) throw new Error("Crypto 指数解析失败");
+  const cryptoJson = JSON.parse(cryptoText.slice(cryptoStart));
   const cnnScore = Number(cnn?.fear_and_greed?.score);
   const cryptoScore = Number(cryptoJson?.data?.[0]?.value);
+  const cryptoDate =
+    normalizeDateValue(cryptoJson?.data?.[0]?.timestamp) ||
+    normalizeDateValue(cryptoJson?.data?.[0]?.time) ||
+    normalizeDateValue(cryptoJson?.data?.[0]?.date);
   const cnnDate =
     normalizeDateValue(cnn?.fear_and_greed?.timestamp) ||
     normalizeDateValue(cnn?.fear_and_greed?.time) ||
@@ -296,6 +306,7 @@ async function fetchFearGreed() {
     cnnFearGreed: Number.isFinite(cnnScore) ? Math.round(cnnScore) : undefined,
     cryptoFearGreed: Number.isFinite(cryptoScore) ? Math.round(cryptoScore) : undefined,
     ...(cnnDate ? { cnnFearGreedDate: cnnDate } : null),
+    ...(cryptoDate ? { cryptoFearGreedDate: cryptoDate } : null),
   };
 
   return values;
