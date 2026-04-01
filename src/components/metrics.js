@@ -1,6 +1,6 @@
 import React from "react";
 const h = React.createElement;
-const formatPercent = (value) => value.toFixed(0);
+const formatPercent = (value) => (typeof value === "number" ? value.toFixed(0) : "--");
 const formatNumber = (value) => (typeof value === "number" ? value.toFixed(2) : "--");
 
 export function Metrics({ metrics }) {

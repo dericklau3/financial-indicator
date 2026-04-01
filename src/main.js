@@ -1,15 +1,14 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { loadMonthlyReturns, saveMonthlyReturns } from "./data/sp500-monthly.js";
-import { marketMetrics, updateMetrics } from "./data/market-metrics.js";
+import { createEmptyMetrics, updateMetrics } from "./data/market-metrics.js";
+import { loadStoredMetrics, saveStoredMetrics } from "./data/storage.js";
+import { fetchSpxMonthlyReturnsFromSources } from "./data/sp500-fetch.js";
 import { Metrics } from "./components/metrics.js";
 import { Heatmap } from "./components/heatmap.js";
 import { Calculator } from "./components/calculator.js";
 
 const h = React.createElement;
-const SENTIMENT_CACHE_KEY = "sentiment-cache-v1";
-
-const todayKey = () => new Date().toISOString().slice(0, 10);
 const toDateKey = (date) => date.toISOString().slice(0, 10);
 
 const normalizeDateValue = (value) => {
@@ -43,29 +42,6 @@ const pickLastDateFromSeries = (series) => {
     );
   }
   return normalizeDateValue(last);
-};
-
-const loadSentimentCache = () => {
-  try {
-    const raw = localStorage.getItem(SENTIMENT_CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed?.values ? { date: parsed?.date, values: parsed.values } : null;
-  } catch (err) {
-    console.warn("读取情绪缓存失败", err);
-    return null;
-  }
-};
-
-const saveSentimentCache = (values) => {
-  try {
-    localStorage.setItem(
-      SENTIMENT_CACHE_KEY,
-      JSON.stringify({ date: todayKey(), values })
-    );
-  } catch (err) {
-    console.warn("写入情绪缓存失败", err);
-  }
 };
 
 const getStreak = (returns) => {
@@ -130,20 +106,11 @@ const SentimentDates = ({ metrics }) => {
 
 function App() {
   const [returns, setReturns] = useState(() => loadMonthlyReturns());
-  const [metrics, setMetrics] = useState({ ...marketMetrics });
+  const [metrics, setMetrics] = useState(() =>
+    updateMetrics(createEmptyMetrics(), loadStoredMetrics() || {})
+  );
   const [view, setView] = useState("dashboard");
   const [sentimentLoading, setSentimentLoading] = useState(false);
-
-  const hasFullSentiment = (values) =>
-    typeof values?.vix === "number" &&
-    typeof values?.cnnFearGreed === "number" &&
-    typeof values?.cryptoFearGreed === "number";
-
-  useEffect(() => {
-    refreshSentiment().catch((err) => {
-      console.warn("自动抓取情绪指标失败", err);
-    });
-  }, []);
 
   const handleUpdateReturns = useCallback(async () => {
     try {
@@ -170,23 +137,17 @@ function App() {
   }, []);
 
   async function refreshSentiment({ force = false } = {}) {
-    const cached = force ? null : loadSentimentCache();
-    const cachedValues = cached?.values;
+    const cachedValues = force ? null : loadStoredMetrics();
 
-    if (cachedValues && hasFullSentiment(cachedValues)) {
-      setMetrics((prev) => updateMetrics({ ...prev, ...cachedValues }));
-    }
-
-    if (cachedValues && !hasFullSentiment(cachedValues)) {
-      // Render any cached subset first to reduce perceived latency.
-      setMetrics((prev) => updateMetrics({ ...prev, ...cachedValues }));
+    if (cachedValues && Object.keys(cachedValues).length) {
+      setMetrics((prev) => updateMetrics(prev, cachedValues));
     }
 
     try {
       const [fearGreed, vix] = await Promise.all([fetchFearGreed(), fetchVix()]);
       const merged = { ...fearGreed, ...vix };
-      saveSentimentCache(merged);
-      setMetrics((prev) => updateMetrics({ ...prev, ...merged }));
+      saveStoredMetrics(merged);
+      setMetrics((prev) => updateMetrics(prev, merged));
       return merged;
     } catch (err) {
       if (cachedValues) return cachedValues;
@@ -195,71 +156,7 @@ function App() {
   }
 
 async function fetchSpxMonthlyReturns() {
-  const sources = [
-    "https://stooq.pl/q/d/l/?s=%5Espx&i=m",
-    "https://r.jina.ai/http://stooq.pl/q/d/l/?s=%5Espx&i=m",
-    `https://api.allorigins.win/raw?url=${encodeURIComponent("https://stooq.pl/q/d/l/?s=%5Espx&i=m")}`,
-  ];
-
-  let text = null;
-  let lastErr = null;
-  for (const url of sources) {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      text = await res.text();
-      if (text && text.length > 20) break;
-    } catch (e) {
-      lastErr = e;
-    }
-  }
-  if (!text) {
-    throw lastErr || new Error("获取标普数据失败");
-  }
-
-  const lines = text.trim().split("\n");
-  // Handle jina proxy wrapping: find the first line that starts with "Data"
-  const dataStart = lines.findIndex((l) => l.startsWith("Data") || l.startsWith("data"));
-  if (dataStart > 0) {
-    lines.splice(0, dataStart);
-  }
-  if (lines.length < 3 || !lines[0].toLowerCase().startsWith("data")) {
-    throw new Error("数据行为空或格式不符");
-  }
-
-  const rows = [];
-  for (let i = 1; i < lines.length; i += 1) {
-    const parts = lines[i].split(",");
-    if (parts.length < 5) continue;
-    const [dateStr, , , , closeStr] = parts;
-    const dt = new Date(dateStr);
-    const close = Number(closeStr);
-    if (!Number.isFinite(close)) continue;
-    rows.push({ dt, close });
-  }
-  rows.sort((a, b) => a.dt - b.dt);
-  if (rows.length < 2) throw new Error("有效数据不足");
-
-  const now = new Date();
-  const lastComplete = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const lastCompleteYm = lastComplete.getFullYear() * 12 + (lastComplete.getMonth() + 1);
-  // +2 shifts the inclusive window so a 15-year span ends at lastComplete and starts at the Jan of (lastComplete.year - 14)
-  const startYm = lastCompleteYm - 15 * 12 + 2;
-
-  const out = [];
-  for (let i = 1; i < rows.length; i += 1) {
-    const ym = rows[i].dt.getFullYear() * 12 + (rows[i].dt.getMonth() + 1);
-    if (ym > lastCompleteYm) break;
-    const ret = (rows[i].close / rows[i - 1].close - 1) * 100;
-    if (ym >= startYm) {
-      out.push({
-        month: rows[i].dt.toISOString().slice(0, 7),
-        returnPct: Number(ret.toFixed(2)),
-      });
-    }
-  }
-  if (!out.length) throw new Error("未生成月度回报");
-  return out;
+  return fetchSpxMonthlyReturnsFromSources(fetch, new Date());
 }
 
 async function fetchFearGreed() {

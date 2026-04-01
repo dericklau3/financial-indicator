@@ -1,44 +1,122 @@
 # Market Pulse Dashboard
 
-一个基于 **React 18 + Vite** 的 Dashboard，展示近 15 年标普 500 每月回报，并在页面顶部显示市场参与度与恐慌/贪婪指标。点击「更新数据」即可在本地修改最新月度回报和指标。
+一个基于 **React 18 + Vite + Bun** 的美股市场面板，展示最近 15 年标普 500 月度回报、VIX、CNN 恐慌与贪婪指数和 Crypto 恐慌与贪婪指数。
 
-## 技术架构
-- React 18 + ReactDOM 18，基于 Vite 开发/构建。
-- 自定义 Canvas 渲染柱状图，避免第三方可视化依赖。
-- 模块化拆分：`src/data` 数据源，`src/components` React 组件（含 Canvas 柱状图与热力图），`src/utils` 工具函数。
+项目不再在仓库里保存默认业务数据。页面会优先读取浏览器 `localStorage`，不会在进入页面时自动抓取远程数据；需要手动点击按钮更新并覆盖本地缓存。
+
+## 技术栈
+
+- React 18 + ReactDOM 18
+- Vite 5
+- Bun 作为包管理器和脚本运行器
+- 浏览器 `localStorage` 作为唯一持久化存储
 
 ## 目录结构
-- `index.html`：页面入口，挂载组件与样式。
-- `styles.css`：视觉样式与布局。
-- `src/main.js`：React 应用入口与页面布局。
-- `src/components/metrics.js`：顶部指标卡片 React 组件。
-- `src/components/heatmap.js`：15 年月度回报热力图（对比示例图的绿色/红色块）。
-- `src/utils/format.js`：格式化工具。
-- `src/data/sp500-monthly.js`：近 15 年每月回报（当前已替换为来自 Stooq ^spx 月度收盘价计算的回报，截止最新完成月份；如需官方数据请用你自己的源覆盖）。
-- `src/data/market-metrics.js`：市场波动（VIX）和恐慌/贪婪指标的默认值。
 
-## 数据来源（点击「更新数据」时实时抓取）
-- 标普 500 月度收盘：`https://stooq.pl/q/d/l/?s=%5Espx&i=m`（CSV），若 CORS 受限会自动尝试 `https://r.jina.ai/http://stooq.pl/q/d/l/?s=%5Espx&i=m` 与 `https://api.allorigins.win/raw?url=...` 作为代理。
-- VIX：`https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?range=5d&interval=1d`，通过 `https://api.allorigins.win/raw?url=...` 和 `https://r.jina.ai/` 代理。
-- CNN 恐慌/贪婪指数：`https://production.dataviz.cnn.io/index/fearandgreed/graphdata`，通过 `https://r.jina.ai/` 代理以便前端直接请求。
-- Crypto 恐慌/贪婪指数：`https://api.alternative.me/fng/?limit=1`，通过 `https://api.allorigins.win/raw?url=...` 代理以避免跨域限制。
+- `index.html`：页面入口
+- `styles.css`：页面样式
+- `src/main.js`：应用入口、远程抓取和状态管理
+- `src/components/metrics.js`：顶部指标卡片
+- `src/components/heatmap.js`：标普 500 月度回报热力图
+- `src/components/calculator.js`：价格波动和卖 PUT 计算器
+- `src/data/storage.js`：`localStorage` 读写与数据校验
+- `src/data/sp500-monthly.js`：月度回报仓储封装
+- `src/data/market-metrics.js`：指标空状态与合并逻辑
+- `src/utils/format.js`：格式化工具
 
-## 本地运行
-项目采用 Vite 作为开发服务器与构建工具。
+## 数据获取方式
+
+页面中的数据全部由前端在浏览器里直接请求外部接口获取。
+
+### 标普 500 月度回报
+
+- 主数据源：`https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?range=20y&interval=1mo&includePrePost=false`
+- 数据格式：Yahoo 月线 JSON
+- 处理方式：读取月线时间戳和收盘价/复权收盘价，计算最近 15 年已完成月份的月度涨跌幅
+- 主代理：
+  - `https://r.jina.ai/http://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?range=20y&interval=1mo&includePrePost=false`
+- 兜底回退：
+  - `https://r.jina.ai/http://stooq.pl/q/d/l/?s=%5Espx&i=m`
+  - `https://api.allorigins.win/raw?url=...`
+
+### VIX
+
+- 数据源：`https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?range=5d&interval=1d`
+- 处理方式：读取最近有效收盘值和对应日期
+- 代理回退：
+  - `https://api.allorigins.win/raw?url=...`
+  - `https://r.jina.ai/https://query1.finance.yahoo.com/...`
+
+### CNN 恐慌与贪婪指数
+
+- 数据源：`https://production.dataviz.cnn.io/index/fearandgreed/graphdata`
+- 处理方式：读取当前分数，并尽量提取最新日期
+- 代理方式：
+  - `https://r.jina.ai/https://production.dataviz.cnn.io/index/fearandgreed/graphdata`
+
+### Crypto 恐慌与贪婪指数
+
+- 数据源：`https://api.alternative.me/fng/?limit=1`
+- 处理方式：读取最新分数和时间戳
+- 代理回退：
+  - `https://api.allorigins.win/raw?url=...`
+  - `https://r.jina.ai/https://api.alternative.me/fng/?limit=1`
+
+## 数据存储方式
+
+项目只把数据保存在当前浏览器的 `localStorage` 中，不会写回仓库，也不依赖 Supabase、后端或数据库。
+
+当前使用的本地缓存键：
+
+- `sp500-monthly-returns-v1`
+- `market-metrics-v1`
+
+这意味着：
+
+- 同一个浏览器刷新页面后，数据会继续保留
+- 更换浏览器、清理站点数据或使用无痕模式后，需要重新抓取
+- 首次访问如果远程源不可用，页面会显示空状态而不是内置假数据
+
+## 页面更新逻辑
+
+- 首次打开页面：
+  - 先读 `localStorage`
+  - 如果没有缓存，就保持空状态
+- 手动更新：
+  - 点击“更新月度回报”会重新抓取并覆盖本地月度回报缓存
+  - 点击“更新情绪指数”会重新抓取并覆盖本地指标缓存
+- 失败回退：
+  - 如果已经有缓存但本次请求失败，页面保留旧缓存
+
+## 本地开发
 
 ### 安装依赖
+
 ```bash
-yarn install
+bun install
 ```
 
-### 本地开发
-```bash
-yarn dev
-```
-默认会在 `http://localhost:5173` 提供热更新开发服务。
+### 启动开发环境
 
-### 生产构建
 ```bash
-yarn build
-yarn preview  # 预览构建产物
+bun dev
 ```
+
+默认地址是 `http://localhost:5173`。
+
+### 运行测试
+
+```bash
+bun test
+```
+
+### 构建与预览
+
+```bash
+bun run build
+bun run preview
+```
+
+## GitHub Pages
+
+项目仍然可以作为纯静态站点部署到 GitHub Pages。由于数据抓取和缓存都在浏览器端完成，部署时不需要额外服务端。

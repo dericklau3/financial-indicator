@@ -1,33 +1,36 @@
-export const marketMetrics = {
-  vix: 15.2,
-  cnnFearGreed: 54,
-  cryptoFearGreed: 48,
-  vixDate: null,
-  cnnFearGreedDate: null,
-  cryptoFearGreedDate: null,
-};
+export function createEmptyMetrics() {
+  return {
+    vix: null,
+    cnnFearGreed: null,
+    cryptoFearGreed: null,
+    vixDate: null,
+    cnnFearGreedDate: null,
+    cryptoFearGreedDate: null,
+  };
+}
 
-/**
- * Quick helper to update metrics in place.
- */
-export function updateMetrics(next) {
-  if (typeof next.vix === "number") {
-    marketMetrics.vix = next.vix;
+export function updateMetrics(current, next) {
+  const base = { ...createEmptyMetrics(), ...(current || {}) };
+  const incoming = next || {};
+
+  if (typeof incoming.vix === "number") {
+    base.vix = incoming.vix;
   }
-  if (typeof next.cnnFearGreed === "number") {
-    marketMetrics.cnnFearGreed = next.cnnFearGreed;
+  if (typeof incoming.cnnFearGreed === "number") {
+    base.cnnFearGreed = incoming.cnnFearGreed;
   }
-  if (typeof next.cryptoFearGreed === "number") {
-    marketMetrics.cryptoFearGreed = next.cryptoFearGreed;
+  if (typeof incoming.cryptoFearGreed === "number") {
+    base.cryptoFearGreed = incoming.cryptoFearGreed;
   }
-  if (typeof next.vixDate === "string") {
-    marketMetrics.vixDate = next.vixDate;
+  if (typeof incoming.vixDate === "string") {
+    base.vixDate = incoming.vixDate;
   }
-  if (typeof next.cnnFearGreedDate === "string") {
-    marketMetrics.cnnFearGreedDate = next.cnnFearGreedDate;
+  if (typeof incoming.cnnFearGreedDate === "string") {
+    base.cnnFearGreedDate = incoming.cnnFearGreedDate;
   }
-  if (typeof next.cryptoFearGreedDate === "string") {
-    marketMetrics.cryptoFearGreedDate = next.cryptoFearGreedDate;
+  if (typeof incoming.cryptoFearGreedDate === "string") {
+    base.cryptoFearGreedDate = incoming.cryptoFearGreedDate;
   }
-  return { ...marketMetrics };
+
+  return base;
 }

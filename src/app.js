@@ -1,5 +1,5 @@
 import { loadMonthlyReturns, upsertMonthlyReturn } from "./data/sp500-monthly.js";
-import { marketMetrics, updateMetrics } from "./data/market-metrics.js";
+import { createEmptyMetrics, updateMetrics } from "./data/market-metrics.js";
 import { renderMetrics } from "./components/metrics.js";
 import {
   renderReturnsChart,
@@ -9,7 +9,7 @@ import { formatPct, formatMonth } from "./utils/format.js";
 
 const state = {
   returns: loadMonthlyReturns(),
-  metrics: { ...marketMetrics },
+  metrics: createEmptyMetrics(),
 };
 
 const metricsContainer = document.getElementById("metrics");
@@ -81,15 +81,11 @@ document.getElementById("updateButton").addEventListener("click", () => {
   const parsed = Number(value);
   if (Number.isNaN(parsed)) return;
 
-  const sp20 = prompt("标普20日参与度（0-100，可留空跳过）", "");
-  const sp50 = prompt("标普50日参与度（0-100，可留空跳过）", "");
   const cnn = prompt("CNN恐慌/贪婪指数（0-100，可留空跳过）", "");
   const crypto = prompt("Crypto恐慌/贪婪指数（0-100，可留空跳过）", "");
 
   state.returns = upsertMonthlyReturn(month, parsed);
-  state.metrics = updateMetrics({
-    spParticipation20: toNumberOrUndefined(sp20),
-    spParticipation50: toNumberOrUndefined(sp50),
+  state.metrics = updateMetrics(state.metrics, {
     cnnFearGreed: toNumberOrUndefined(cnn),
     cryptoFearGreed: toNumberOrUndefined(crypto),
   });
