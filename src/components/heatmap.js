@@ -27,7 +27,7 @@ const HeatmapCell = ({ value }) => {
   );
 };
 
-export function Heatmap({ data, onUpdate }) {
+export function Heatmap({ data }) {
   const filtered = React.useMemo(() => {
     if (!data.length) return [];
     const toYm = (m) => {
@@ -62,18 +62,7 @@ export function Heatmap({ data, onUpdate }) {
         null,
         h("p", { className: "eyebrow" }, "S&P 500 Monthly Returns"),
         h("h2", null, "最近15年每月回报热力图")
-      ),
-      onUpdate
-        ? h(
-            "div",
-            { className: "actions" },
-            h(
-              "button",
-              { className: "ghost", onClick: onUpdate },
-              "更新月度回报"
-            )
-          )
-        : null
+      )
     ),
     h(
       "div",

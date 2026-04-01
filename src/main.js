@@ -1,66 +1,14 @@
-import React, { useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { loadMonthlyReturns, saveMonthlyReturns } from "./data/sp500-monthly.js";
 import { createEmptyMetrics, updateMetrics } from "./data/market-metrics.js";
-import { loadStoredMetrics, saveStoredMetrics } from "./data/storage.js";
-import { fetchSpxMonthlyReturnsFromSources } from "./data/sp500-fetch.js";
+import { loadDashboardDataFromSupabase } from "./data/supabase.js";
 import { Metrics } from "./components/metrics.js";
 import { Heatmap } from "./components/heatmap.js";
 import { Calculator } from "./components/calculator.js";
 
 const h = React.createElement;
-const toDateKey = (date) => date.toISOString().slice(0, 10);
 
-const normalizeDateValue = (value) => {
-  if (value === null || value === undefined) return null;
-  if (typeof value === "number") {
-    const millis = value > 1e12 ? value : value > 1e9 ? value * 1000 : NaN;
-    if (!Number.isFinite(millis)) return null;
-    const dt = new Date(millis);
-    return Number.isNaN(dt.getTime()) ? null : toDateKey(dt);
-  }
-  if (typeof value === "string" && value.trim()) {
-    const numeric = Number(value);
-    if (Number.isFinite(numeric)) {
-      return normalizeDateValue(numeric);
-    }
-    const dt = new Date(value);
-    return Number.isNaN(dt.getTime()) ? null : toDateKey(dt);
-  }
-  return null;
-};
-
-const pickLastDateFromSeries = (series) => {
-  if (!Array.isArray(series) || !series.length) return null;
-  const last = series[series.length - 1];
-  if (typeof last === "object" && last !== null) {
-    return (
-      normalizeDateValue(last.x) ||
-      normalizeDateValue(last.timestamp) ||
-      normalizeDateValue(last.date) ||
-      normalizeDateValue(last.time)
-    );
-  }
-  return normalizeDateValue(last);
-};
-
-const getStreak = (returns) => {
-  if (!returns.length) return "--";
-  let count = 1;
-  let direction = returns[returns.length - 1].returnPct >= 0 ? "up" : "down";
-  for (let i = returns.length - 2; i >= 0; i -= 1) {
-    const sign = returns[i].returnPct >= 0 ? "up" : "down";
-    if (sign === direction) {
-      count += 1;
-    } else {
-      break;
-    }
-  }
-  const arrow = direction === "up" ? "↑" : "↓";
-  return `${arrow} ${count} 月`;
-};
-
-const Hero = ({ onRefreshSentiment, sentimentLoading }) =>
+const Hero = () =>
   h(
     "header",
     { className: "hero" },
@@ -73,19 +21,6 @@ const Hero = ({ onRefreshSentiment, sentimentLoading }) =>
         null,
         h("p", { className: "eyebrow" }, "Market Dashboard"),
         h("h1", null, "US Equity & Macro Pulse")
-      )
-    ),
-    h(
-      "div",
-      { className: "actions" },
-      h(
-        "button",
-        {
-          className: "ghost",
-          onClick: onRefreshSentiment,
-          disabled: sentimentLoading,
-        },
-        sentimentLoading ? "更新中…" : "更新情绪指数"
       )
     )
   );
@@ -105,298 +40,34 @@ const SentimentDates = ({ metrics }) => {
 };
 
 function App() {
-  const [returns, setReturns] = useState(() => loadMonthlyReturns());
-  const [metrics, setMetrics] = useState(() =>
-    updateMetrics(createEmptyMetrics(), loadStoredMetrics() || {})
-  );
+  const [returns, setReturns] = useState([]);
+  const [metrics, setMetrics] = useState(() => createEmptyMetrics());
   const [view, setView] = useState("dashboard");
-  const [sentimentLoading, setSentimentLoading] = useState(false);
+  const [loadError, setLoadError] = useState(null);
 
-  const handleUpdateReturns = useCallback(async () => {
-    try {
-      const latestReturns = await fetchSpxMonthlyReturns();
-      setReturns(latestReturns);
-      saveMonthlyReturns(latestReturns);
-      alert("月度回报已更新。");
-    } catch (err) {
-      console.error(err);
-      alert(`抓取失败：${err.message || err}`);
-    }
-  }, []);
+  useEffect(() => {
+    let cancelled = false;
 
-  const handleRefreshSentiment = useCallback(async () => {
-    setSentimentLoading(true);
-    try {
-      await refreshSentiment({ force: true });
-    } catch (err) {
-      console.error(err);
-      alert(`情绪指数更新失败：${err.message || err}`);
-    } finally {
-      setSentimentLoading(false);
-    }
-  }, []);
-
-  async function refreshSentiment({ force = false } = {}) {
-    const cachedValues = force ? null : loadStoredMetrics();
-
-    if (cachedValues && Object.keys(cachedValues).length) {
-      setMetrics((prev) => updateMetrics(prev, cachedValues));
-    }
-
-    try {
-      const [fearGreed, vix] = await Promise.all([fetchFearGreed(), fetchVix()]);
-      const merged = { ...fearGreed, ...vix };
-      saveStoredMetrics(merged);
-      setMetrics((prev) => updateMetrics(prev, merged));
-      return merged;
-    } catch (err) {
-      if (cachedValues) return cachedValues;
-      throw err;
-    }
-  }
-
-async function fetchSpxMonthlyReturns() {
-  return fetchSpxMonthlyReturnsFromSources(fetch, new Date());
-}
-
-async function fetchFearGreed() {
-  const cnnUrl = "https://r.jina.ai/https://production.dataviz.cnn.io/index/fearandgreed/graphdata";
-  const cryptoSources = [
-    `https://api.alternative.me/fng/?limit=1&ts=${Date.now()}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(
-      `https://api.alternative.me/fng/?limit=1&ts=${Date.now()}`
-    )}`,
-    "https://r.jina.ai/https://api.alternative.me/fng/?limit=1",
-  ];
-
-  const [cnnText, cryptoText] = await Promise.all([
-    fetch(cnnUrl).then((r) => {
-      if (!r.ok) throw new Error(`CNN指数请求失败 ${r.status}`);
-      return r.text();
-    }),
-    fetchTextFromSources(cryptoSources, 20),
-  ]);
-
-  const start = cnnText.indexOf("{");
-  if (start < 0) throw new Error("CNN 指数解析失败");
-  const cnn = JSON.parse(cnnText.slice(start));
-  const cryptoStart = cryptoText.indexOf("{");
-  if (cryptoStart < 0) throw new Error("Crypto 指数解析失败");
-  const cryptoJson = JSON.parse(cryptoText.slice(cryptoStart));
-  const cnnScore = Number(cnn?.fear_and_greed?.score);
-  const cryptoScore = Number(cryptoJson?.data?.[0]?.value);
-  const cryptoDate =
-    normalizeDateValue(cryptoJson?.data?.[0]?.timestamp) ||
-    normalizeDateValue(cryptoJson?.data?.[0]?.time) ||
-    normalizeDateValue(cryptoJson?.data?.[0]?.date);
-  const cnnDate =
-    normalizeDateValue(cnn?.fear_and_greed?.timestamp) ||
-    normalizeDateValue(cnn?.fear_and_greed?.time) ||
-    normalizeDateValue(cnn?.fear_and_greed?.date) ||
-    normalizeDateValue(cnn?.fear_and_greed?.last_updated) ||
-    normalizeDateValue(cnn?.fear_and_greed?.lastUpdated) ||
-    normalizeDateValue(cnn?.fear_and_greed?.updated) ||
-    pickLastDateFromSeries(cnn?.fear_and_greed_historical?.data) ||
-    pickLastDateFromSeries(cnn?.fear_and_greed_history?.data);
-
-  const values = {
-    cnnFearGreed: Number.isFinite(cnnScore) ? Math.round(cnnScore) : undefined,
-    cryptoFearGreed: Number.isFinite(cryptoScore) ? Math.round(cryptoScore) : undefined,
-    ...(cnnDate ? { cnnFearGreedDate: cnnDate } : null),
-    ...(cryptoDate ? { cryptoFearGreedDate: cryptoDate } : null),
-  };
-
-  return values;
-}
-
-async function fetchVix() {
-  const sources = [
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(
-      "https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?range=5d&interval=1d"
-    )}`,
-    "https://r.jina.ai/https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?range=5d&interval=1d",
-  ];
-
-  const text = await fetchTextFromSources(sources, 20);
-  const jsonStart = text.indexOf("{");
-  if (jsonStart < 0) throw new Error("VIX 数据无效");
-  const json = JSON.parse(text.slice(jsonStart));
-  const close =
-    json?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter((v) => Number.isFinite(v)).pop() ??
-    json?.chart?.result?.[0]?.meta?.regularMarketPrice;
-  if (!Number.isFinite(close)) throw new Error("VIX 数据无效");
-  const vixTimestamp =
-    json?.chart?.result?.[0]?.timestamp?.filter((t) => Number.isFinite(t)).pop() ??
-    json?.chart?.result?.[0]?.meta?.regularMarketTime;
-  const vixDate = normalizeDateValue(vixTimestamp);
-  const values = {
-    vix: Number(close.toFixed(2)),
-    ...(vixDate ? { vixDate } : null),
-  };
-  return values;
-}
-
-function parseCloseFromCsv(text) {
-  const lines = text
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean);
-  const csvLines = lines.filter((l) => l.includes(","));
-  const headerLine = csvLines.find((l) => /symbol/i.test(l) && /close/i.test(l));
-  const headerIdx = headerLine ? csvLines.indexOf(headerLine) : -1;
-  const headers = headerLine
-    ? headerLine.split(",").map((p) => p.trim().toLowerCase())
-    : ["symbol", "date", "time", "open", "high", "low", "close", "volume"];
-
-  const dataLine =
-    headerIdx >= 0
-      ? csvLines.slice(headerIdx + 1).find((l) => l.split(",").length >= headers.length)
-      : csvLines.find((l) => l.split(",").length >= headers.length);
-
-  if (!dataLine) throw new Error("未找到数据行");
-
-  const cells = dataLine.split(",").map((p) => p.trim());
-  const closeIdx = headers.findIndex((h) => h === "close");
-  const scrub = (val) => Number(val.replace(/[^0-9.+-]/g, ""));
-
-  const candidate = closeIdx >= 0 && cells[closeIdx] ? cells[closeIdx] : cells[cells.length - 2] || cells[cells.length - 1];
-  let close = candidate ? scrub(candidate) : NaN;
-
-  if (!Number.isFinite(close)) {
-    // Fallback: pick the last numeric cell in the row.
-    const numerics = cells.map(scrub).filter((n) => Number.isFinite(n));
-    close = numerics.length ? numerics[numerics.length - 1] : NaN;
-  }
-
-  if (!Number.isFinite(close)) throw new Error("收盘价解析失败");
-  return close;
-}
-
-async function fetchTextFromSources(sources, minLength = 50) {
-  let text = null;
-  let lastErr = null;
-  for (const url of sources) {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const maybeText = await res.text();
-      if (maybeText && maybeText.length >= minLength) {
-        text = maybeText;
-        break;
+    async function loadDashboardData() {
+      try {
+        const { metrics: nextMetrics, returns: nextReturns } = await loadDashboardDataFromSupabase();
+        if (cancelled) return;
+        setMetrics(updateMetrics(createEmptyMetrics(), nextMetrics));
+        setReturns(nextReturns);
+        setLoadError(null);
+      } catch (err) {
+        if (cancelled) return;
+        console.error(err);
+        setLoadError(err instanceof Error ? err.message : String(err));
       }
-    } catch (err) {
-      lastErr = err;
     }
-  }
-  if (!text) {
-    throw lastErr || new Error("未获取到文本");
-  }
-  return text;
-}
 
-async function fetchTradingViewLast(ticker) {
-  const path = `https://www.tradingview.com/symbols/${ticker}/`;
-  const sources = [
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(path)}`,
-    `https://r.jina.ai/https://${path.replace("https://", "")}`,
-    `https://r.jina.ai/http://${path.replace("https://", "")}`,
-  ];
+    loadDashboardData();
 
-  const text = await fetchTextFromSources(sources, 50);
-
-  const lpMatch = text.match(/\"lp\":\s*([0-9]+(?:\.[0-9]+)?)/);
-  if (lpMatch) {
-    return Number(lpMatch[1]);
-  }
-
-  const priceMatch =
-    text.match(/\"regularMarketPrice\":\s*([0-9]+(?:\.[0-9]+)?)/) ||
-    text.match(/\"last\"\s*:\s*([0-9]+(?:\.[0-9]+)?)/) ||
-    text.match(/\"price\"\s*:\s*([0-9]+(?:\.[0-9]+)?)/);
-  if (priceMatch) {
-    return Number(priceMatch[1]);
-  }
-
-  // Fallback: attempt to parse via CSV if response accidentally a CSV from proxy.
-  try {
-    const close = parseCloseFromCsv(text);
-    return close;
-  } catch (e) {
-    throw new Error("未解析到最新价");
-  }
-}
-
-async function fetchTradingViewScanner(tickers) {
-  const payload = JSON.stringify({
-    symbols: { tickers, query: { types: [] } },
-    columns: ["close"],
-  });
-
-  const endpoints = [
-    "https://scanner.tradingview.com/america/scan",
-    "https://cors.isomorphic-git.org/https://scanner.tradingview.com/america/scan",
-    "https://thingproxy.freeboard.io/fetch/https://scanner.tradingview.com/america/scan",
-  ];
-
-  let lastErr = null;
-  for (const url of endpoints) {
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Referer: "https://www.tradingview.com",
-          Origin: "https://www.tradingview.com",
-        },
-        body: payload,
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      if (!json?.data?.length) throw new Error("TradingView 扫描器无数据");
-
-      const map = {};
-      json.data.forEach((item) => {
-        const symbol = item?.s;
-        const [close] = item?.d || [];
-        if (symbol && Number.isFinite(close)) {
-          map[symbol] = close;
-        }
-      });
-
-      if (Object.keys(map).length) return map;
-      throw new Error("TradingView 扫描器未返回价格");
-    } catch (err) {
-      lastErr = err;
-    }
-  }
-
-  throw lastErr || new Error("TradingView 扫描器请求失败");
-}
-
-async function fetchYahooBreadth(symbol) {
-  const base = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5d&interval=1d`;
-  const sources = [
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(base)}`,
-    `https://r.jina.ai/https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
-      symbol
-    )}?range=5d&interval=1d`,
-  ];
-
-  const text = await fetchTextFromSources(sources, 20);
-  const jsonStart = text.indexOf("{");
-  if (jsonStart < 0) throw new Error("Yahoo 数据无效");
-  const json = JSON.parse(text.slice(jsonStart));
-  const close =
-    json?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter((v) => Number.isFinite(v)).pop() ??
-    json?.chart?.result?.[0]?.meta?.regularMarketPrice;
-  if (!Number.isFinite(close)) throw new Error("Yahoo 数据无效");
-  return Math.round(close);
-}
-
-  async function fetchParticipationBoth() {
-    // kept for backward compatibility; participation指标已下线
-    throw new Error("参与度已下线");
-  }
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const investorLinks = [
     {
@@ -435,10 +106,13 @@ async function fetchYahooBreadth(symbol) {
     h(
       React.Fragment,
       null,
-      h(Hero, { onRefreshSentiment: handleRefreshSentiment, sentimentLoading }),
+      h(Hero),
       h(SentimentDates, { metrics }),
+      loadError
+        ? h("p", { className: "eyebrow", role: "alert" }, `数据加载失败：${loadError}`)
+        : null,
       h(Metrics, { metrics }),
-      h(Heatmap, { data: returns, onUpdate: handleUpdateReturns })
+      h(Heatmap, { data: returns })
     );
 
   const renderInvestors = () =>
