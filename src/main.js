@@ -39,6 +39,41 @@ const SentimentDates = ({ metrics }) => {
   );
 };
 
+const FredPage = () =>
+  h(
+    "section",
+    { className: "fred-page" },
+    h(
+      "div",
+      { className: "fred-page__header" },
+      h(
+        "div",
+        null,
+        h("p", { className: "eyebrow" }, "FRED Series"),
+        h("h2", null, "5-Year, 5-Year Forward Inflation Expectation Rate")
+      ),
+      h(
+        "a",
+        {
+          className: "fred-page__source",
+          href: "https://fred.stlouisfed.org/series/T5YIFR",
+          target: "_blank",
+          rel: "noreferrer",
+        },
+        "打开原网页"
+      )
+    ),
+    h(
+      "div",
+      { className: "fred-embed" },
+      h("iframe", {
+        src: "https://fred.stlouisfed.org/graph/?id=T5YIFR",
+        title: "FRED T5YIFR series page",
+        loading: "lazy",
+      })
+    )
+  );
+
 function App() {
   const [returns, setReturns] = useState([]);
   const [metrics, setMetrics] = useState(() => createEmptyMetrics());
@@ -98,6 +133,7 @@ function App() {
 
   const navItems = [
     { id: "dashboard", label: "Dashboard", desc: "宏观热力图" },
+    { id: "fred", label: "FRED", desc: "通胀预期图表" },
     { id: "calculator", label: "计算器", desc: "价格波动 / 卖权" },
     { id: "investors", label: "名人持仓", desc: "名人持仓" },
   ];
@@ -144,6 +180,7 @@ function App() {
 
   const renderPage = () => {
     if (view === "dashboard") return renderDashboard();
+    if (view === "fred") return h(FredPage);
     if (view === "calculator") return h(Calculator);
     if (view === "investors") return renderInvestors();
     return null;
