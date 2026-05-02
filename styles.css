@@ -154,6 +154,63 @@ body {
   color: var(--accent);
 }
 
+.fred-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.fred-page__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(93, 214, 255, 0.07), rgba(124, 93, 255, 0.08));
+  box-shadow: var(--shadow);
+}
+
+.fred-page__header h2 {
+  margin-top: 4px;
+  font-size: 26px;
+}
+
+.fred-page__source {
+  flex: 0 0 auto;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(93, 214, 255, 0.34);
+  color: var(--accent);
+  background: rgba(93, 214, 255, 0.08);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.fred-page__source:hover {
+  border-color: rgba(93, 214, 255, 0.58);
+  background: rgba(93, 214, 255, 0.13);
+}
+
+.fred-embed {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: var(--shadow);
+  height: min(820px, calc(100vh - 170px));
+  min-height: 620px;
+  overflow: hidden;
+}
+
+.fred-embed iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
 .hero {
   display: flex;
   justify-content: space-between;
@@ -696,6 +753,15 @@ input[type="number"] {
   .calculator__grid,
   .pct-row {
     grid-template-columns: 1fr;
+  }
+
+  .fred-page__header {
+    flex-direction: column;
+  }
+
+  .fred-embed {
+    height: 680px;
+    min-height: 560px;
   }
 
   .content {
