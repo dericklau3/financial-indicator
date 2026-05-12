@@ -129,6 +129,18 @@ function App() {
       desc: "ARK Innovation ETF 持仓",
       url: "https://www.ark-funds.com/funds/arkk#hold",
     },
+    {
+      id: "situational-awareness",
+      name: "Situational Awareness",
+      desc: "Leopold Aschenbrenner 13F 持仓",
+      url: "https://hedgefollow.com/funds/Situational+Awareness",
+    },
+    {
+      id: "nancy-pelosi",
+      name: "Nancy Pelosi",
+      desc: "国会议员股票持仓",
+      url: "https://hedgefollow.com/congress-stock-tracker/Nancy-Pelosi",
+    },
   ];
 
   const navItems = [
