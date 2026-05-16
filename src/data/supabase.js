@@ -10,6 +10,17 @@ function toMonthKey(value) {
   return typeof value === "string" && value.length >= 7 ? value.slice(0, 7) : null;
 }
 
+function toFiniteNumber(value) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
 function getSupabaseConfig(options = {}) {
   const supabaseUrl = options.supabaseUrl ?? import.meta.env.VITE_SUPABASE_URL;
   const supabaseAnonKey = options.supabaseAnonKey ?? import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -56,10 +67,13 @@ export function mapCronRowToMetrics(row) {
 
   const date = normalizeDateString(row.date);
   const next = {};
+  const vix = toFiniteNumber(row.vix);
+  const cnnFearGreed = toFiniteNumber(row.cnn_fear_greed);
+  const cryptoFearGreed = toFiniteNumber(row.crypto_fear_greed);
 
-  if (typeof row.vix === "number") next.vix = row.vix;
-  if (typeof row.cnn_fear_greed === "number") next.cnnFearGreed = row.cnn_fear_greed;
-  if (typeof row.crypto_fear_greed === "number") next.cryptoFearGreed = row.crypto_fear_greed;
+  if (vix !== null) next.vix = vix;
+  if (cnnFearGreed !== null) next.cnnFearGreed = cnnFearGreed;
+  if (cryptoFearGreed !== null) next.cryptoFearGreed = cryptoFearGreed;
   if (date) {
     next.vixDate = date;
     next.cnnFearGreedDate = date;
@@ -75,12 +89,15 @@ export function mapMonthlyReturnRows(rows) {
   }
 
   return rows
-    .filter((row) => row && typeof row.return_pct === "number")
     .map((row) => ({
-      month: toMonthKey(row.month),
-      returnPct: row.return_pct,
+      month: row ? toMonthKey(row.month) : null,
+      returnPct: row ? toFiniteNumber(row.return_pct) : null,
     }))
-    .filter((row) => typeof row.month === "string")
+    .filter((row) => typeof row.month === "string" && row.returnPct !== null)
+    .map((row) => ({
+      month: row.month,
+      returnPct: row.returnPct,
+    }))
     .sort((a, b) => (a.month > b.month ? 1 : -1));
 }
 

@@ -26,6 +26,24 @@ describe("supabase dashboard data helpers", () => {
     });
   });
 
+  test("maps supabase numeric strings into dashboard metrics", () => {
+    expect(
+      mapCronRowToMetrics({
+        date: "2026-05-16",
+        vix: "18.43",
+        cnn_fear_greed: "63",
+        crypto_fear_greed: "31",
+      })
+    ).toEqual({
+      vix: 18.43,
+      cnnFearGreed: 63,
+      cryptoFearGreed: 31,
+      vixDate: "2026-05-16",
+      cnnFearGreedDate: "2026-05-16",
+      cryptoFearGreedDate: "2026-05-16",
+    });
+  });
+
   test("maps monthly return rows into heatmap data", () => {
     expect(
       mapMonthlyReturnRows([
@@ -35,6 +53,18 @@ describe("supabase dashboard data helpers", () => {
     ).toEqual([
       { month: "2011-04", returnPct: 2.4634 },
       { month: "2011-05", returnPct: -0.969 },
+    ]);
+  });
+
+  test("maps supabase numeric strings into heatmap data", () => {
+    expect(
+      mapMonthlyReturnRows([
+        { month: "2026-04-01", return_pct: "10.4233" },
+        { month: "2026-03-01", return_pct: "-5.0933" },
+      ])
+    ).toEqual([
+      { month: "2026-03", returnPct: -5.0933 },
+      { month: "2026-04", returnPct: 10.4233 },
     ]);
   });
 
