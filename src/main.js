@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createEmptyMetrics, updateMetrics } from "./data/market-metrics.js";
-import { loadDashboardDataFromSupabase } from "./data/supabase.js";
+import { loadDashboardDataFromSupabase, loadInvestorLinksFromSupabase } from "./data/supabase.js";
 import { Metrics } from "./components/metrics.js";
 import { Heatmap } from "./components/heatmap.js";
 import { Calculator } from "./components/calculator.js";
@@ -77,8 +77,10 @@ const FredPage = () =>
 function App() {
   const [returns, setReturns] = useState([]);
   const [metrics, setMetrics] = useState(() => createEmptyMetrics());
+  const [investorLinks, setInvestorLinks] = useState([]);
   const [view, setView] = useState("dashboard");
   const [loadError, setLoadError] = useState(null);
+  const [investorLoadError, setInvestorLoadError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -104,44 +106,28 @@ function App() {
     };
   }, []);
 
-  const investorLinks = [
-    {
-      id: "duanyongping",
-      name: "段永平",
-      desc: "H&H Holdings 持仓",
-      url: "https://www.dataroma.com/m/holdings.php?m=HH",
-    },
-    {
-      id: "buffett",
-      name: "巴菲特",
-      desc: "Berkshire Hathaway 持仓",
-      url: "https://www.dataroma.com/m/holdings.php?m=BRK",
-    },
-    {
-      id: "ark",
-      name: "ARK",
-      desc: "ARK Investment Management 持仓",
-      url: "https://hedgefollow.com/funds/ARK+Investment+Management",
-    },
-    {
-      id: "arkk",
-      name: "ARKK",
-      desc: "ARK Innovation ETF 持仓",
-      url: "https://www.ark-funds.com/funds/arkk#hold",
-    },
-    {
-      id: "situational-awareness",
-      name: "Situational Awareness",
-      desc: "Leopold Aschenbrenner 13F 持仓",
-      url: "https://hedgefollow.com/funds/Situational+Awareness",
-    },
-    {
-      id: "nancy-pelosi",
-      name: "Nancy Pelosi",
-      desc: "国会议员股票持仓",
-      url: "https://hedgefollow.com/congress-stock-tracker/Nancy-Pelosi",
-    },
-  ];
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadInvestorLinks() {
+      try {
+        const links = await loadInvestorLinksFromSupabase();
+        if (cancelled) return;
+        setInvestorLinks(links);
+        setInvestorLoadError(null);
+      } catch (err) {
+        if (cancelled) return;
+        console.error(err);
+        setInvestorLoadError(err instanceof Error ? err.message : String(err));
+      }
+    }
+
+    loadInvestorLinks();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const navItems = [
     { id: "dashboard", label: "Dashboard", desc: "宏观热力图" },
@@ -169,24 +155,29 @@ function App() {
       { className: "investor-page" },
       h("p", { className: "eyebrow" }, "Investor Radar"),
       h("h2", null, "名人持仓跟踪"),
+      investorLoadError
+        ? h("p", { className: "eyebrow", role: "alert" }, `持仓链接加载失败：${investorLoadError}`)
+        : null,
       h(
         "div",
         { className: "investor-grid" },
-        investorLinks.map((item) =>
-          h(
-            "a",
-            {
-              key: item.id,
-              className: "investor-card",
-              href: item.url,
-              target: "_blank",
-              rel: "noreferrer",
-            },
-            h("div", { className: "investor-card__title" }, item.name),
-            h("p", { className: "investor-card__desc" }, item.desc),
-            h("span", { className: "investor-card__cta" }, "查看持仓 →")
-          )
-        )
+        investorLinks.length
+          ? investorLinks.map((item) =>
+              h(
+                "a",
+                {
+                  key: item.id,
+                  className: "investor-card",
+                  href: item.url,
+                  target: "_blank",
+                  rel: "noreferrer",
+                },
+                h("div", { className: "investor-card__title" }, item.name),
+                h("p", { className: "investor-card__desc" }, item.desc),
+                h("span", { className: "investor-card__cta" }, "查看持仓 →")
+              )
+            )
+          : h("p", { className: "muted" }, "暂无持仓链接")
       )
     );
 

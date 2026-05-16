@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
   loadDashboardDataFromSupabase,
+  loadInvestorLinksFromSupabase,
+  mapInvestorLinkRows,
   mapCronRowToMetrics,
   mapMonthlyReturnRows,
 } from "./supabase.js";
@@ -33,6 +35,50 @@ describe("supabase dashboard data helpers", () => {
     ).toEqual([
       { month: "2011-04", returnPct: 2.4634 },
       { month: "2011-05", returnPct: -0.969 },
+    ]);
+  });
+
+  test("maps investor link rows into card data sorted by display order", () => {
+    expect(
+      mapInvestorLinkRows([
+        {
+          slug: "buffett",
+          name: "巴菲特",
+          description: "Berkshire Hathaway 持仓",
+          url: "https://www.dataroma.com/m/holdings.php?m=BRK",
+          display_order: 2,
+          is_active: true,
+        },
+        {
+          slug: "hidden",
+          name: "Hidden",
+          description: "Hidden holding",
+          url: "https://example.com/hidden",
+          display_order: 3,
+          is_active: false,
+        },
+        {
+          slug: "duanyongping",
+          name: "段永平",
+          description: "H&H Holdings 持仓",
+          url: "https://www.dataroma.com/m/holdings.php?m=HH",
+          display_order: 1,
+          is_active: true,
+        },
+      ])
+    ).toEqual([
+      {
+        id: "duanyongping",
+        name: "段永平",
+        desc: "H&H Holdings 持仓",
+        url: "https://www.dataroma.com/m/holdings.php?m=HH",
+      },
+      {
+        id: "buffett",
+        name: "巴菲特",
+        desc: "Berkshire Hathaway 持仓",
+        url: "https://www.dataroma.com/m/holdings.php?m=BRK",
+      },
     ]);
   });
 
@@ -83,5 +129,45 @@ describe("supabase dashboard data helpers", () => {
     expect(calls).toHaveLength(2);
     expect(calls[0]).toContain("cron_data");
     expect(calls[1]).toContain("sp500_monthly_returns");
+  });
+
+  test("loads active investor links from supabase", async () => {
+    const calls = [];
+    const fetchImpl = async (url) => {
+      calls.push(String(url));
+      return {
+        ok: true,
+        async json() {
+          return [
+            {
+              slug: "duanyongping",
+              name: "段永平",
+              description: "H&H Holdings 持仓",
+              url: "https://www.dataroma.com/m/holdings.php?m=HH",
+              display_order: 1,
+              is_active: true,
+            },
+          ];
+        },
+      };
+    };
+
+    const result = await loadInvestorLinksFromSupabase(fetchImpl, {
+      supabaseUrl: "https://example.supabase.co",
+      supabaseAnonKey: "anon-key",
+    });
+
+    expect(result).toEqual([
+      {
+        id: "duanyongping",
+        name: "段永平",
+        desc: "H&H Holdings 持仓",
+        url: "https://www.dataroma.com/m/holdings.php?m=HH",
+      },
+    ]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain("investor_links");
+    expect(calls[0]).toContain("is_active=eq.true");
+    expect(calls[0]).toContain("order=display_order.asc");
   });
 });

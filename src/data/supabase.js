@@ -84,6 +84,33 @@ export function mapMonthlyReturnRows(rows) {
     .sort((a, b) => (a.month > b.month ? 1 : -1));
 }
 
+export function mapInvestorLinkRows(rows) {
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+
+  return rows
+    .filter((row) => row && row.is_active !== false)
+    .filter(
+      (row) =>
+        typeof row.slug === "string" &&
+        typeof row.name === "string" &&
+        typeof row.description === "string" &&
+        typeof row.url === "string"
+    )
+    .sort((a, b) => {
+      const aOrder = typeof a.display_order === "number" ? a.display_order : Number.MAX_SAFE_INTEGER;
+      const bOrder = typeof b.display_order === "number" ? b.display_order : Number.MAX_SAFE_INTEGER;
+      return aOrder - bOrder || a.name.localeCompare(b.name);
+    })
+    .map((row) => ({
+      id: row.slug,
+      name: row.name,
+      desc: row.description,
+      url: row.url,
+    }));
+}
+
 export async function loadDashboardDataFromSupabase(fetchImpl = fetch, options = {}) {
   const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig(options);
   const cronUrl =
@@ -101,4 +128,13 @@ export async function loadDashboardDataFromSupabase(fetchImpl = fetch, options =
     metrics: mapCronRowToMetrics(Array.isArray(cronRows) ? cronRows[0] : null),
     returns: mapMonthlyReturnRows(returnRows),
   };
+}
+
+export async function loadInvestorLinksFromSupabase(fetchImpl = fetch, options = {}) {
+  const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig(options);
+  const investorLinksUrl =
+    `${supabaseUrl}/rest/v1/investor_links?select=slug,name,description,url,display_order,is_active` +
+    `&is_active=eq.true&order=display_order.asc`;
+
+  return mapInvestorLinkRows(await fetchJson(fetchImpl, investorLinksUrl, supabaseAnonKey));
 }
