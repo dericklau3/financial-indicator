@@ -50,7 +50,12 @@ const FredPage = () =>
         "div",
         null,
         h("p", { className: "eyebrow" }, "FRED Series"),
-        h("h2", null, "5-Year, 5-Year Forward Inflation Expectation Rate")
+        h("h2", null, "5-Year, 5-Year Forward Inflation Expectation Rate"),
+        h(
+          "p",
+          { className: "fred-page__hint" },
+          "当通胀率处于低位时，是一个好的买入点"
+        )
       ),
       h(
         "a",

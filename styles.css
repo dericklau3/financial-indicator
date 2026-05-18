@@ -177,6 +177,13 @@ body {
   font-size: 26px;
 }
 
+.fred-page__hint {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 .fred-page__source {
   flex: 0 0 auto;
   padding: 9px 12px;

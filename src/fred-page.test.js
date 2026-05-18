@@ -8,5 +8,6 @@ describe("FRED page wiring", () => {
     expect(mainSource).toContain('id: "fred"');
     expect(mainSource).toContain('src: "https://fred.stlouisfed.org/graph/?id=T5YIFR"');
     expect(mainSource).toContain('title: "FRED T5YIFR series page"');
+    expect(mainSource).toContain("当通胀率处于低位时，是一个好的买入点");
   });
 });
