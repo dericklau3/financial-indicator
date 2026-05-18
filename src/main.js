@@ -5,6 +5,7 @@ import { loadDashboardDataFromSupabase, loadInvestorLinksFromSupabase } from "./
 import { Metrics } from "./components/metrics.js";
 import { Heatmap } from "./components/heatmap.js";
 import { Calculator } from "./components/calculator.js";
+import { getInitialView, saveSelectedView } from "./view-state.js";
 
 const h = React.createElement;
 
@@ -83,7 +84,7 @@ function App() {
   const [returns, setReturns] = useState([]);
   const [metrics, setMetrics] = useState(() => createEmptyMetrics());
   const [investorLinks, setInvestorLinks] = useState([]);
-  const [view, setView] = useState("dashboard");
+  const [view, setView] = useState(() => getInitialView());
   const [loadError, setLoadError] = useState(null);
   const [investorLoadError, setInvestorLoadError] = useState(null);
 
@@ -140,6 +141,11 @@ function App() {
     { id: "calculator", label: "计算器", desc: "价格波动 / 卖权" },
     { id: "investors", label: "名人持仓", desc: "名人持仓" },
   ];
+
+  const selectView = (nextView) => {
+    saveSelectedView(nextView);
+    setView(nextView);
+  };
 
   const renderDashboard = () =>
     h(
@@ -215,7 +221,7 @@ function App() {
             {
               key: item.id,
               className: `sidebar__link ${view === item.id ? "active" : ""}`,
-              onClick: () => setView(item.id),
+              onClick: () => selectView(item.id),
             },
             h("div", { className: "sidebar__link__title" }, item.label),
             h("p", { className: "sidebar__link__desc" }, item.desc)
