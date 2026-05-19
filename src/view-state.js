@@ -1,5 +1,5 @@
 const SELECTED_VIEW_KEY = "market-pulse-selected-view";
-const VALID_VIEWS = new Set(["dashboard", "fred", "calculator", "investors"]);
+const VALID_VIEWS = new Set(["dashboard", "fred", "fedfunds", "calculator", "investors"]);
 
 const getStorage = (storage) => {
   if (storage) return storage;

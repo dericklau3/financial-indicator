@@ -12,6 +12,7 @@ const createStorage = (initial = {}) => {
 describe("view state persistence", () => {
   test("restores a valid saved sidebar view", () => {
     expect(getInitialView(createStorage({ "market-pulse-selected-view": "fred" }))).toBe("fred");
+    expect(getInitialView(createStorage({ "market-pulse-selected-view": "fedfunds" }))).toBe("fedfunds");
   });
 
   test("falls back to dashboard when saved view is missing or invalid", () => {

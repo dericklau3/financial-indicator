@@ -40,7 +40,7 @@ const SentimentDates = ({ metrics }) => {
   );
 };
 
-const FredPage = () =>
+const FredPage = ({ title, hint, sourceUrl, graphUrl, iframeTitle }) =>
   h(
     "section",
     { className: "fred-page" },
@@ -51,18 +51,18 @@ const FredPage = () =>
         "div",
         null,
         h("p", { className: "eyebrow" }, "FRED Series"),
-        h("h2", null, "5-Year, 5-Year Forward Inflation Expectation Rate"),
+        h("h2", null, title),
         h(
           "p",
           { className: "fred-page__hint" },
-          "当通胀率处于低位时，是一个好的买入点"
+          hint
         )
       ),
       h(
         "a",
         {
           className: "fred-page__source",
-          href: "https://fred.stlouisfed.org/series/T5YIFR",
+          href: sourceUrl,
           target: "_blank",
           rel: "noreferrer",
         },
@@ -73,8 +73,8 @@ const FredPage = () =>
       "div",
       { className: "fred-embed" },
       h("iframe", {
-        src: "https://fred.stlouisfed.org/graph/?id=T5YIFR",
-        title: "FRED T5YIFR series page",
+        src: graphUrl,
+        title: iframeTitle,
         loading: "lazy",
       })
     )
@@ -138,6 +138,7 @@ function App() {
   const navItems = [
     { id: "dashboard", label: "Dashboard", desc: "宏观热力图" },
     { id: "fred", label: "FRED", desc: "通胀预期图表" },
+    { id: "fedfunds", label: "FRED 利率", desc: "联储利率图表" },
     { id: "calculator", label: "计算器", desc: "价格波动 / 卖权" },
     { id: "investors", label: "名人持仓", desc: "名人持仓" },
   ];
@@ -194,7 +195,24 @@ function App() {
 
   const renderPage = () => {
     if (view === "dashboard") return renderDashboard();
-    if (view === "fred") return h(FredPage);
+    if (view === "fred") {
+      return h(FredPage, {
+        title: "5-Year, 5-Year Forward Inflation Expectation Rate",
+        hint: "当通胀率处于低位时，是一个好的买入点",
+        sourceUrl: "https://fred.stlouisfed.org/series/T5YIFR",
+        graphUrl: "https://fred.stlouisfed.org/graph/?id=T5YIFR",
+        iframeTitle: "FRED T5YIFR series page",
+      });
+    }
+    if (view === "fedfunds") {
+      return h(FredPage, {
+        title: "Federal Funds Effective Rate",
+        hint: "跟踪美联储有效联邦基金利率，观察利率周期和货币政策环境",
+        sourceUrl: "https://fred.stlouisfed.org/series/FEDFUNDS",
+        graphUrl: "https://fred.stlouisfed.org/graph/?id=FEDFUNDS",
+        iframeTitle: "FRED FEDFUNDS series page",
+      });
+    }
     if (view === "calculator") return h(Calculator);
     if (view === "investors") return renderInvestors();
     return null;
