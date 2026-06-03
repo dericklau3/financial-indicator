@@ -40,7 +40,7 @@ const SentimentDates = ({ metrics }) => {
   );
 };
 
-const FredPage = ({ title, hint, sourceUrl, graphUrl, iframeTitle }) =>
+const ExternalIndicatorPage = ({ eyebrow, title, hint, sourceUrl, graphUrl, iframeTitle }) =>
   h(
     "section",
     { className: "fred-page" },
@@ -50,7 +50,7 @@ const FredPage = ({ title, hint, sourceUrl, graphUrl, iframeTitle }) =>
       h(
         "div",
         null,
-        h("p", { className: "eyebrow" }, "FRED Series"),
+        h("p", { className: "eyebrow" }, eyebrow),
         h("h2", null, title),
         h(
           "p",
@@ -139,6 +139,8 @@ function App() {
     { id: "dashboard", label: "Dashboard", desc: "宏观热力图" },
     { id: "fred", label: "FRED", desc: "通胀预期图表" },
     { id: "fedfunds", label: "FRED 利率", desc: "联储利率图表" },
+    { id: "sp500pe", label: "S&P 500 PE", desc: "10年估值图表" },
+    { id: "nasdaq100pe", label: "Nasdaq 100 PE", desc: "10年估值图表" },
     { id: "calculator", label: "计算器", desc: "价格波动 / 卖权" },
     { id: "investors", label: "名人持仓", desc: "名人持仓" },
   ];
@@ -196,7 +198,8 @@ function App() {
   const renderPage = () => {
     if (view === "dashboard") return renderDashboard();
     if (view === "fred") {
-      return h(FredPage, {
+      return h(ExternalIndicatorPage, {
+        eyebrow: "FRED Series",
         title: "5-Year, 5-Year Forward Inflation Expectation Rate",
         hint: "当通胀率处于低位时，是一个好的买入点",
         sourceUrl: "https://fred.stlouisfed.org/series/T5YIFR",
@@ -205,12 +208,33 @@ function App() {
       });
     }
     if (view === "fedfunds") {
-      return h(FredPage, {
+      return h(ExternalIndicatorPage, {
+        eyebrow: "FRED Series",
         title: "Federal Funds Effective Rate",
         hint: "跟踪美联储有效联邦基金利率，观察利率周期和货币政策环境",
         sourceUrl: "https://fred.stlouisfed.org/series/FEDFUNDS",
         graphUrl: "https://fred.stlouisfed.org/graph/?id=FEDFUNDS",
         iframeTitle: "FRED FEDFUNDS series page",
+      });
+    }
+    if (view === "sp500pe") {
+      return h(ExternalIndicatorPage, {
+        eyebrow: "GuruFocus Market Valuation",
+        title: "S&P 500 PE Ratio",
+        hint: "建议查看 10Y 区间，用于观察标普500估值所处位置",
+        sourceUrl: "https://www.gurufocus.com/economic_indicators/57/sp-500-pe-ratio",
+        graphUrl: "https://www.gurufocus.com/economic_indicators/57/sp-500-pe-ratio",
+        iframeTitle: "GuruFocus S&P 500 PE Ratio 10Y page",
+      });
+    }
+    if (view === "nasdaq100pe") {
+      return h(ExternalIndicatorPage, {
+        eyebrow: "GuruFocus Market Valuation",
+        title: "Nasdaq 100 PE Ratio",
+        hint: "建议查看 10Y 区间，用于观察纳斯达克100估值所处位置",
+        sourceUrl: "https://www.gurufocus.com/economic_indicators/6778/nasdaq-100-pe-ratio",
+        graphUrl: "https://www.gurufocus.com/economic_indicators/6778/nasdaq-100-pe-ratio",
+        iframeTitle: "GuruFocus Nasdaq 100 PE Ratio 10Y page",
       });
     }
     if (view === "calculator") return h(Calculator);

@@ -13,6 +13,8 @@ describe("view state persistence", () => {
   test("restores a valid saved sidebar view", () => {
     expect(getInitialView(createStorage({ "market-pulse-selected-view": "fred" }))).toBe("fred");
     expect(getInitialView(createStorage({ "market-pulse-selected-view": "fedfunds" }))).toBe("fedfunds");
+    expect(getInitialView(createStorage({ "market-pulse-selected-view": "sp500pe" }))).toBe("sp500pe");
+    expect(getInitialView(createStorage({ "market-pulse-selected-view": "nasdaq100pe" }))).toBe("nasdaq100pe");
   });
 
   test("falls back to dashboard when saved view is missing or invalid", () => {
