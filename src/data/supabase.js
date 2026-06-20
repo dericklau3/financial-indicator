@@ -21,6 +21,16 @@ function toFiniteNumber(value) {
   return null;
 }
 
+function normalizeHttpsUrl(value) {
+  if (typeof value !== "string") return null;
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === "https:" ? url.href : null;
+  } catch (_err) {
+    return null;
+  }
+}
+
 function getSupabaseConfig(options = {}) {
   const supabaseUrl = options.supabaseUrl ?? import.meta.env.VITE_SUPABASE_URL;
   const supabaseAnonKey = options.supabaseAnonKey ?? import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -107,13 +117,17 @@ export function mapInvestorLinkRows(rows) {
   }
 
   return rows
-    .filter((row) => row && row.is_active !== false)
+    .map((row) => {
+      const url = row ? normalizeHttpsUrl(row.url) : null;
+      return row && url ? { ...row, url } : null;
+    })
     .filter(
       (row) =>
+        row &&
+        row.is_active !== false &&
         typeof row.slug === "string" &&
         typeof row.name === "string" &&
-        typeof row.description === "string" &&
-        typeof row.url === "string"
+        typeof row.description === "string"
     )
     .sort((a, b) => {
       const aOrder = typeof a.display_order === "number" ? a.display_order : Number.MAX_SAFE_INTEGER;

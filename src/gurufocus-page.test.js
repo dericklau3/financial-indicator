@@ -20,4 +20,9 @@ describe("GuruFocus page wiring", () => {
     expect(mainSource).toContain('sourceUrl: "https://www.gurufocus.com/economic_indicators/6778/nasdaq-100-pe-ratio"');
     expect(mainSource).toContain('iframeTitle: "GuruFocus Nasdaq 100 PE Ratio 10Y page"');
   });
+
+  test("renders external indicator iframes with restrictive browser policies", () => {
+    expect(mainSource).toContain('sandbox: "allow-scripts allow-same-origin allow-popups"');
+    expect(mainSource).toContain('referrerPolicy: "no-referrer"');
+  });
 });

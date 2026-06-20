@@ -112,6 +112,44 @@ describe("supabase dashboard data helpers", () => {
     ]);
   });
 
+  test("drops investor links with unsafe URL schemes", () => {
+    expect(
+      mapInvestorLinkRows([
+        {
+          slug: "script",
+          name: "Script Link",
+          description: "Should not render",
+          url: "javascript:alert(1)",
+          display_order: 1,
+          is_active: true,
+        },
+        {
+          slug: "plain-http",
+          name: "Plain HTTP Link",
+          description: "Should not render",
+          url: "http://example.com/holdings",
+          display_order: 2,
+          is_active: true,
+        },
+        {
+          slug: "safe",
+          name: "Safe Link",
+          description: "Should render",
+          url: "https://example.com/holdings",
+          display_order: 3,
+          is_active: true,
+        },
+      ])
+    ).toEqual([
+      {
+        id: "safe",
+        name: "Safe Link",
+        desc: "Should render",
+        url: "https://example.com/holdings",
+      },
+    ]);
+  });
+
   test("loads cron_data singleton and ordered monthly returns from supabase", async () => {
     const calls = [];
     const fetchImpl = async (url) => {

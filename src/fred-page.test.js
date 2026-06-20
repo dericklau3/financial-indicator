@@ -18,4 +18,9 @@ describe("FRED page wiring", () => {
     expect(mainSource).toContain('graphUrl: "https://fred.stlouisfed.org/graph/?id=FEDFUNDS"');
     expect(mainSource).toContain('iframeTitle: "FRED FEDFUNDS series page"');
   });
+
+  test("renders external indicator iframes with restrictive browser policies", () => {
+    expect(mainSource).toContain('sandbox: "allow-scripts allow-same-origin allow-popups"');
+    expect(mainSource).toContain('referrerPolicy: "no-referrer"');
+  });
 });

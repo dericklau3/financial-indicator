@@ -76,6 +76,8 @@ const ExternalIndicatorPage = ({ eyebrow, title, hint, sourceUrl, graphUrl, ifra
         src: graphUrl,
         title: iframeTitle,
         loading: "lazy",
+        sandbox: "allow-scripts allow-same-origin allow-popups",
+        referrerPolicy: "no-referrer",
       })
     )
   );
