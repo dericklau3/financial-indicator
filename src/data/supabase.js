@@ -142,6 +142,62 @@ export function mapInvestorLinkRows(rows) {
     }));
 }
 
+export function mapSectorPerformanceRows(rows) {
+  if (!Array.isArray(rows)) {
+    return {
+      asOf: null,
+      source: "Supabase sector_performance",
+      rows: [],
+    };
+  }
+
+  const mappedRows = rows
+    .map((row) => {
+      if (!row || typeof row !== "object") return null;
+      const asOf = normalizeDateString(row.as_of);
+      const daily = toFiniteNumber(row.daily_return_pct);
+      const oneMonth = toFiniteNumber(row.one_month_return_pct);
+      const threeMonth = toFiniteNumber(row.three_month_return_pct);
+      const sixMonth = toFiniteNumber(row.six_month_return_pct);
+      const ytd = toFiniteNumber(row.ytd_return_pct);
+
+      if (
+        !asOf ||
+        typeof row.name !== "string" ||
+        typeof row.symbol !== "string" ||
+        typeof row.category !== "string" ||
+        daily === null ||
+        oneMonth === null ||
+        threeMonth === null ||
+        sixMonth === null ||
+        ytd === null
+      ) {
+        return null;
+      }
+
+      return {
+        asOf,
+        displayOrder: typeof row.display_order === "number" ? row.display_order : Number.MAX_SAFE_INTEGER,
+        name: row.name,
+        symbol: row.symbol,
+        category: row.category,
+        daily,
+        oneMonth,
+        threeMonth,
+        sixMonth,
+        ytd,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name));
+
+  return {
+    asOf: mappedRows.map((row) => row.asOf).sort().pop() || null,
+    source: "Supabase sector_performance",
+    rows: mappedRows.map(({ displayOrder: _displayOrder, ...row }) => row),
+  };
+}
+
 export async function loadDashboardDataFromSupabase(fetchImpl = fetch, options = {}) {
   const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig(options);
   const cronUrl =
@@ -168,4 +224,14 @@ export async function loadInvestorLinksFromSupabase(fetchImpl = fetch, options =
     `&is_active=eq.true&order=display_order.asc`;
 
   return mapInvestorLinkRows(await fetchJson(fetchImpl, investorLinksUrl, supabaseAnonKey));
+}
+
+export async function loadSectorPerformanceFromSupabase(fetchImpl = fetch, options = {}) {
+  const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig(options);
+  const sectorPerformanceUrl =
+    `${supabaseUrl}/rest/v1/sector_performance` +
+    `?select=as_of,name,symbol,category,display_order,daily_return_pct,one_month_return_pct,three_month_return_pct,six_month_return_pct,ytd_return_pct` +
+    `&order=display_order.asc`;
+
+  return mapSectorPerformanceRows(await fetchJson(fetchImpl, sectorPerformanceUrl, supabaseAnonKey));
 }

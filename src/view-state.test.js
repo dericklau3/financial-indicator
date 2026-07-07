@@ -15,6 +15,7 @@ describe("view state persistence", () => {
     expect(getInitialView(createStorage({ "market-pulse-selected-view": "fedfunds" }))).toBe("fedfunds");
     expect(getInitialView(createStorage({ "market-pulse-selected-view": "sp500pe" }))).toBe("sp500pe");
     expect(getInitialView(createStorage({ "market-pulse-selected-view": "nasdaq100pe" }))).toBe("nasdaq100pe");
+    expect(getInitialView(createStorage({ "market-pulse-selected-view": "sectors" }))).toBe("sectors");
   });
 
   test("falls back to dashboard when saved view is missing or invalid", () => {

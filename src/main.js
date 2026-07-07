@@ -1,10 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createEmptyMetrics, updateMetrics } from "./data/market-metrics.js";
-import { loadDashboardDataFromSupabase, loadInvestorLinksFromSupabase } from "./data/supabase.js";
+import {
+  loadDashboardDataFromSupabase,
+  loadInvestorLinksFromSupabase,
+  loadSectorPerformanceFromSupabase,
+} from "./data/supabase.js";
 import { Metrics } from "./components/metrics.js";
 import { Heatmap } from "./components/heatmap.js";
 import { Calculator } from "./components/calculator.js";
+import { SectorPerformance } from "./components/sector-performance.js";
 import { getInitialView, saveSelectedView } from "./view-state.js";
 
 const h = React.createElement;
@@ -86,9 +91,12 @@ function App() {
   const [returns, setReturns] = useState([]);
   const [metrics, setMetrics] = useState(() => createEmptyMetrics());
   const [investorLinks, setInvestorLinks] = useState([]);
+  const [sectorPerformance, setSectorPerformance] = useState(null);
   const [view, setView] = useState(() => getInitialView());
   const [loadError, setLoadError] = useState(null);
   const [investorLoadError, setInvestorLoadError] = useState(null);
+  const [sectorLoadError, setSectorLoadError] = useState(null);
+  const [isSectorLoading, setIsSectorLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,6 +116,32 @@ function App() {
     }
 
     loadDashboardData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSectorPerformance() {
+      setIsSectorLoading(true);
+      try {
+        const snapshot = await loadSectorPerformanceFromSupabase();
+        if (cancelled) return;
+        setSectorPerformance(snapshot);
+        setSectorLoadError(null);
+      } catch (err) {
+        if (cancelled) return;
+        console.error(err);
+        setSectorLoadError(err instanceof Error ? err.message : String(err));
+      } finally {
+        if (!cancelled) setIsSectorLoading(false);
+      }
+    }
+
+    loadSectorPerformance();
 
     return () => {
       cancelled = true;
@@ -143,6 +177,7 @@ function App() {
     { id: "fedfunds", label: "FRED 利率", desc: "联储利率图表" },
     { id: "sp500pe", label: "S&P 500 PE", desc: "10年估值图表" },
     { id: "nasdaq100pe", label: "Nasdaq 100 PE", desc: "10年估值图表" },
+    { id: "sectors", label: "板块表现", desc: "1月 / 3月 / YTD" },
     { id: "calculator", label: "计算器", desc: "价格波动 / 卖权" },
     { id: "investors", label: "名人持仓", desc: "名人持仓" },
   ];
@@ -237,6 +272,13 @@ function App() {
         sourceUrl: "https://www.gurufocus.com/economic_indicators/6778/nasdaq-100-pe-ratio",
         graphUrl: "https://www.gurufocus.com/economic_indicators/6778/nasdaq-100-pe-ratio",
         iframeTitle: "GuruFocus Nasdaq 100 PE Ratio 10Y page",
+      });
+    }
+    if (view === "sectors") {
+      return h(SectorPerformance, {
+        snapshot: sectorPerformance,
+        isLoading: isSectorLoading,
+        loadError: sectorLoadError,
       });
     }
     if (view === "calculator") return h(Calculator);

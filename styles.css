@@ -218,6 +218,115 @@ body {
   border: 0;
 }
 
+.sector-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sector-page__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(93, 214, 255, 0.07), rgba(124, 93, 255, 0.08));
+  box-shadow: var(--shadow);
+}
+
+.sector-page__header h2 {
+  margin-top: 4px;
+  font-size: 26px;
+}
+
+.sector-page__hint {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.sector-table {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel-2);
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+}
+
+.sector-table__row {
+  min-width: 560px;
+  display: grid;
+  grid-template-columns: minmax(132px, 1.35fr) repeat(5, minmax(70px, 0.8fr));
+  align-items: center;
+  gap: 7px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sector-table__row:last-child {
+  border-bottom: none;
+}
+
+.sector-table__head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(15, 21, 44, 0.96);
+}
+
+.sector-table__sector {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sector-table__name {
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.sector-table__meta {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.sector-table__value {
+  width: fit-content;
+  min-width: 58px;
+  padding: 5px 6px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.sector-table__empty {
+  padding: 16px 12px;
+}
+
+.sector-table__value.up {
+  color: var(--success);
+  background: rgba(109, 213, 140, 0.1);
+}
+
+.sector-table__value.down {
+  color: var(--danger);
+  background: rgba(255, 107, 107, 0.1);
+}
+
+.sector-table__value.flat {
+  color: var(--muted);
+}
+
 .hero {
   display: flex;
   justify-content: space-between;

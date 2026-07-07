@@ -1,0 +1,12 @@
+[Unit]
+Description=Update financial indicator sector performance in Supabase
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/financial-indicator-sector-updater
+ExecStart=/usr/bin/python3 /opt/financial-indicator-sector-updater/sector_performance_updater.py --config /opt/financial-indicator-sector-updater/config.json
+Nice=5

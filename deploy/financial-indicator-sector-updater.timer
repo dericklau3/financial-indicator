@@ -1,0 +1,10 @@
+[Unit]
+Description=Run financial indicator sector updater after US market close
+
+[Timer]
+OnCalendar=Tue..Sat *-*-* 06:10:00
+Persistent=true
+Unit=financial-indicator-sector-updater.service
+
+[Install]
+WantedBy=timers.target

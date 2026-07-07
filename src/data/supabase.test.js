@@ -2,9 +2,11 @@ import { describe, expect, test } from "bun:test";
 import {
   loadDashboardDataFromSupabase,
   loadInvestorLinksFromSupabase,
+  loadSectorPerformanceFromSupabase,
   mapInvestorLinkRows,
   mapCronRowToMetrics,
   mapMonthlyReturnRows,
+  mapSectorPerformanceRows,
 } from "./supabase.js";
 
 describe("supabase dashboard data helpers", () => {
@@ -236,6 +238,101 @@ describe("supabase dashboard data helpers", () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]).toContain("investor_links");
     expect(calls[0]).toContain("is_active=eq.true");
+    expect(calls[0]).toContain("order=display_order.asc");
+  });
+
+  test("maps sector performance rows into ordered dashboard data", () => {
+    expect(
+      mapSectorPerformanceRows([
+        {
+          as_of: "2026-07-06",
+          name: "Bitcoin",
+          symbol: "BTC",
+          category: "加密",
+          display_order: 20,
+          daily_return_pct: "1.4",
+          one_month_return_pct: "4.0",
+          three_month_return_pct: "-6.8",
+          six_month_return_pct: "-30.8",
+          ytd_return_pct: "-28.9",
+        },
+        {
+          as_of: "2026-07-06",
+          name: "科技",
+          symbol: "XLK",
+          category: "美股板块",
+          display_order: 1,
+          daily_return_pct: 1.7,
+          one_month_return_pct: 1.8,
+          three_month_return_pct: 34.2,
+          six_month_return_pct: 25.2,
+          ytd_return_pct: 27.2,
+        },
+      ])
+    ).toEqual({
+      asOf: "2026-07-06",
+      source: "Supabase sector_performance",
+      rows: [
+        {
+          asOf: "2026-07-06",
+          name: "科技",
+          symbol: "XLK",
+          category: "美股板块",
+          daily: 1.7,
+          oneMonth: 1.8,
+          threeMonth: 34.2,
+          sixMonth: 25.2,
+          ytd: 27.2,
+        },
+        {
+          asOf: "2026-07-06",
+          name: "Bitcoin",
+          symbol: "BTC",
+          category: "加密",
+          daily: 1.4,
+          oneMonth: 4,
+          threeMonth: -6.8,
+          sixMonth: -30.8,
+          ytd: -28.9,
+        },
+      ],
+    });
+  });
+
+  test("loads sector performance from supabase", async () => {
+    const calls = [];
+    const fetchImpl = async (url) => {
+      calls.push(String(url));
+      return {
+        ok: true,
+        async json() {
+          return [
+            {
+              as_of: "2026-07-06",
+              name: "科技",
+              symbol: "XLK",
+              category: "美股板块",
+              display_order: 1,
+              daily_return_pct: 1.7,
+              one_month_return_pct: 1.8,
+              three_month_return_pct: 34.2,
+              six_month_return_pct: 25.2,
+              ytd_return_pct: 27.2,
+            },
+          ];
+        },
+      };
+    };
+
+    const result = await loadSectorPerformanceFromSupabase(fetchImpl, {
+      supabaseUrl: "https://example.supabase.co",
+      supabaseAnonKey: "anon-key",
+    });
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].daily).toBe(1.7);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain("sector_performance");
     expect(calls[0]).toContain("order=display_order.asc");
   });
 });

@@ -7,6 +7,7 @@ const VALID_VIEWS = new Set([
   "nasdaq100pe",
   "calculator",
   "investors",
+  "sectors",
 ]);
 
 const getStorage = (storage) => {
