@@ -9,7 +9,7 @@ import {
 import { Metrics } from "./components/metrics.js";
 import { Heatmap } from "./components/heatmap.js";
 import { Calculator } from "./components/calculator.js";
-import { SectorPerformance } from "./components/sector-performance.js";
+import { SectorDetail, SectorPerformance } from "./components/sector-performance.js";
 import { getInitialView, saveSelectedView } from "./view-state.js";
 
 const h = React.createElement;
@@ -92,6 +92,7 @@ function App() {
   const [metrics, setMetrics] = useState(() => createEmptyMetrics());
   const [investorLinks, setInvestorLinks] = useState([]);
   const [sectorPerformance, setSectorPerformance] = useState(null);
+  const [selectedSector, setSelectedSector] = useState(null);
   const [view, setView] = useState(() => getInitialView());
   const [loadError, setLoadError] = useState(null);
   const [investorLoadError, setInvestorLoadError] = useState(null);
@@ -183,8 +184,16 @@ function App() {
   ];
 
   const selectView = (nextView) => {
+    if (nextView !== "sectorDetail") {
+      setSelectedSector(null);
+    }
     saveSelectedView(nextView);
     setView(nextView);
+  };
+
+  const openSectorDetail = (sector) => {
+    setSelectedSector(sector);
+    setView("sectorDetail");
   };
 
   const renderDashboard = () =>
@@ -279,6 +288,13 @@ function App() {
         snapshot: sectorPerformance,
         isLoading: isSectorLoading,
         loadError: sectorLoadError,
+        onSelectSector: openSectorDetail,
+      });
+    }
+    if (view === "sectorDetail") {
+      return h(SectorDetail, {
+        sector: selectedSector,
+        onBack: () => selectView("sectors"),
       });
     }
     if (view === "calculator") return h(Calculator);
@@ -306,7 +322,7 @@ function App() {
             "button",
             {
               key: item.id,
-              className: `sidebar__link ${view === item.id ? "active" : ""}`,
+              className: `sidebar__link ${view === item.id || (item.id === "sectors" && view === "sectorDetail") ? "active" : ""}`,
               onClick: () => selectView(item.id),
             },
             h("div", { className: "sidebar__link__title" }, item.label),

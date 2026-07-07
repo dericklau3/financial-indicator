@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { SectorPerformance } from "./sector-performance.js";
+import { SectorDetail, SectorPerformance } from "./sector-performance.js";
 
 describe("SectorPerformance", () => {
   test("renders sector performance ranges and crypto rows", () => {
@@ -48,7 +48,30 @@ describe("SectorPerformance", () => {
     expect(html).toContain("加密");
     expect(html).toContain("Bitcoin");
     expect(html).toContain("2026-07-06");
-    expect(html).toContain("2026-07-05");
+    expect(html).not.toContain("BTC · 加密 · 2026-07-05");
+    expect(html).toContain("<button");
+    expect(html).toContain("查看科技详情");
+    expect(html).not.toContain("title=");
+  });
+
+  test("renders sector detail with ETFDB outbound link only", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(SectorDetail, {
+        sector: {
+          name: "工业",
+          symbol: "XLI",
+          category: "美股板块",
+          asOf: "2026-07-06",
+        },
+        onBack: () => {},
+      })
+    );
+
+    expect(html).toContain("工业");
+    expect(html).toContain("制造业、基建和资本开支");
+    expect(html).toContain("https://etfdb.com/etf/XLI/#holdings");
+    expect(html).not.toContain("<iframe");
+    expect(html).toContain("返回板块表现");
   });
 
   test("renders loading, error, and empty states compactly", () => {

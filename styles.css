@@ -289,8 +289,74 @@ body {
 }
 
 .sector-table__name {
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
   font-weight: 800;
   font-size: 14px;
+  text-align: left;
+  text-decoration: underline solid rgba(93, 214, 255, 0.55);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.sector-table__name:hover {
+  color: var(--accent);
+  transform: none;
+}
+
+.sector-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sector-detail__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(93, 214, 255, 0.07), rgba(124, 93, 255, 0.08));
+  box-shadow: var(--shadow);
+}
+
+.sector-detail__header h2 {
+  margin-top: 4px;
+  font-size: 26px;
+}
+
+.sector-detail__hint {
+  max-width: 820px;
+  margin-top: 8px;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.sector-detail__meta {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.sector-detail__back {
+  flex: 0 0 auto;
+}
+
+.sector-detail__toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.sector-detail__toolbar h3 {
+  margin: 0;
 }
 
 .sector-table__meta {
