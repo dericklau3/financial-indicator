@@ -198,6 +198,10 @@ def build_rows(session_date):
     for item in SECTORS:
         closes = fetch_nasdaq_closes(item["symbol"], item["assetclass"], start_date, session_date)
         returns = calculate_returns(closes, session_date)
+        if item["assetclass"] == "etf" and returns["as_of"] != session_date.isoformat():
+            raise ValueError(
+                f"{item['symbol']} latest close is {returns['as_of']}, expected {session_date.isoformat()}"
+            )
         rows.append(
             {
                 "symbol": item["symbol"],

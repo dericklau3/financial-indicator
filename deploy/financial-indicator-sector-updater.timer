@@ -2,7 +2,7 @@
 Description=Run financial indicator sector updater after US market close
 
 [Timer]
-OnCalendar=Tue..Sat *-*-* 06:10:00
+OnCalendar=Tue..Sat *-*-* 10:00:00
 Persistent=true
 Unit=financial-indicator-sector-updater.service
 
