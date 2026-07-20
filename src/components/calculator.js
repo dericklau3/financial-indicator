@@ -8,7 +8,35 @@ const formatCurrency = (value) => {
   return value.toFixed(2);
 };
 
+const formatCurrencyValue = (value) => {
+  if (!Number.isFinite(value)) return "--";
+  return `$${formatCurrency(value)}`;
+};
+
 const clampPct = (val) => Math.max(0, Math.min(300, val));
+
+const NUMERIC_INPUT_RE = /^\d*(?:\.\d*)?$/;
+
+export const normalizeNumericInput = (nextValue, previousValue = "") => {
+  if (NUMERIC_INPUT_RE.test(nextValue)) return nextValue;
+  return previousValue;
+};
+
+export const parseNumericInput = (value) => {
+  if (value === "" || value === ".") return null;
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : null;
+};
+
+const numericInputProps = {
+  type: "text",
+  inputMode: "decimal",
+  pattern: "[0-9]*[.]?[0-9]*",
+};
+
+const updateNumericInput = (setter) => (nextValue) => {
+  setter((previousValue) => normalizeNumericInput(nextValue, previousValue));
+};
 
 const PctRow = ({
   label,
@@ -32,7 +60,7 @@ const PctRow = ({
       "div",
       { className: "pct-row__label" },
       h("span", { className: "pill small", style: { color: color, borderColor: color } }, label),
-      h("div", { className: "pct-row__value" }, formatPct(value, 0))
+      h("div", { className: "pct-row__value" }, Number.isFinite(value) ? formatPct(value, 0) : "--")
     ),
     h(
       "div",
@@ -43,16 +71,13 @@ const PctRow = ({
         { className: "field__row" },
         h("span", { className: "prefix" }, "%"),
         h("input", {
-          type: "number",
+          ...numericInputProps,
           value: inputValue,
-          min: 0,
-          max: 300,
-          step: "0.1",
           onChange: (e) => {
-            const next = e.target.value;
+            const next = normalizeNumericInput(e.target.value, inputValue);
             onInputChange(next);
-            const num = Number(next);
-            if (Number.isFinite(num)) onChange(clampPct(num));
+            const num = parseNumericInput(next);
+            onChange(num === null ? null : clampPct(num));
           },
           onFocus: onPctFocus,
           onBlur: onPctBlur,
@@ -68,15 +93,12 @@ const PctRow = ({
         { className: "result-chip__input" },
         h("span", { className: "prefix" }, "$"),
         h("input", {
-          type: "number",
+          ...numericInputProps,
           value: priceInput,
-          min: 0,
-          step: "0.01",
           onChange: (e) => {
-            const next = e.target.value;
+            const next = normalizeNumericInput(e.target.value, priceInput);
             onPriceInputChange(next);
-            const num = Number(next);
-            if (Number.isFinite(num)) onChangePrice?.(num);
+            onChangePrice?.(parseNumericInput(next));
           },
           onFocus: onPriceFocus,
           onBlur: onPriceBlur,
@@ -86,51 +108,60 @@ const PctRow = ({
   );
 
 export function Calculator() {
-  const [buyPriceInput, setBuyPriceInput] = React.useState("100");
-  const [upPct, setUpPct] = React.useState(8);
-  const [downPct, setDownPct] = React.useState(6);
-  const [upPctInput, setUpPctInput] = React.useState("8");
-  const [downPctInput, setDownPctInput] = React.useState("6");
-  const [upPriceInput, setUpPriceInput] = React.useState("108.00");
-  const [downPriceInput, setDownPriceInput] = React.useState("94.00");
+  const [buyPriceInput, setBuyPriceInput] = React.useState("");
+  const [upPct, setUpPct] = React.useState(null);
+  const [downPct, setDownPct] = React.useState(null);
+  const [upPctInput, setUpPctInput] = React.useState("");
+  const [downPctInput, setDownPctInput] = React.useState("");
+  const [upPriceInput, setUpPriceInput] = React.useState("");
+  const [downPriceInput, setDownPriceInput] = React.useState("");
   const [editingUpPct, setEditingUpPct] = React.useState(false);
   const [editingDownPct, setEditingDownPct] = React.useState(false);
   const [editingUpPrice, setEditingUpPrice] = React.useState(false);
   const [editingDownPrice, setEditingDownPrice] = React.useState(false);
-  const [strikeInput, setStrikeInput] = React.useState("225");
-  const [premiumInput, setPremiumInput] = React.useState("3.2");
-  const [contractsInput, setContractsInput] = React.useState("1");
-  const [budgetInput, setBudgetInput] = React.useState("10000");
-  const [sharePriceInput, setSharePriceInput] = React.useState("150");
+  const [strikeInput, setStrikeInput] = React.useState("");
+  const [premiumInput, setPremiumInput] = React.useState("");
+  const [contractsInput, setContractsInput] = React.useState("");
+  const [budgetInput, setBudgetInput] = React.useState("");
+  const [sharePriceInput, setSharePriceInput] = React.useState("");
 
-  const toNumber = (val, fallback) => {
-    const n = Number(val);
-    return Number.isFinite(n) ? n : fallback;
-  };
+  const buyPrice = parseNumericInput(buyPriceInput);
+  const strike = parseNumericInput(strikeInput);
+  const premium = parseNumericInput(premiumInput);
+  const contractsValue = parseNumericInput(contractsInput);
+  const budget = parseNumericInput(budgetInput);
+  const sharePrice = parseNumericInput(sharePriceInput);
+  const contracts =
+    contractsValue === null ? null : Math.max(0, Math.round(contractsValue));
+  const contractsForCalculation = contracts ?? 0;
 
-  const buyPrice = Math.max(0, toNumber(buyPriceInput, 0));
-  const strike = Math.max(0, toNumber(strikeInput, 0));
-  const premium = Math.max(0, toNumber(premiumInput, 0));
-  const contracts = Math.max(1, Math.round(toNumber(contractsInput, 1)));
-  const budget = Math.max(0, toNumber(budgetInput, 0));
-  const sharePrice = Math.max(0, toNumber(sharePriceInput, 0));
-
-  const upPrice = buyPrice * (1 + upPct / 100);
-  const downPrice = buyPrice * (1 - downPct / 100);
-  const netCostPerShare = strike - premium;
-  const premiumTotal = premium * 100 * contracts;
-  const assignmentCost = netCostPerShare * 100 * contracts;
+  const upPrice =
+    buyPrice !== null && upPct !== null ? buyPrice * (1 + upPct / 100) : null;
+  const downPrice =
+    buyPrice !== null && downPct !== null ? buyPrice * (1 - downPct / 100) : null;
+  const netCostPerShare =
+    strike !== null && premium !== null ? strike - premium : null;
+  const premiumTotal =
+    premium !== null && contracts !== null ? premium * 100 * contractsForCalculation : null;
+  const assignmentCost =
+    netCostPerShare !== null && contracts !== null
+      ? netCostPerShare * 100 * contractsForCalculation
+      : null;
   const shareCount =
-    sharePrice > 0 ? Math.max(0, Math.floor(budget / sharePrice)) : 0;
+    budget !== null && sharePrice !== null && sharePrice > 0
+      ? Math.max(0, Math.floor(budget / sharePrice))
+      : null;
   const remainingCash =
-    sharePrice > 0 ? Math.max(0, budget - shareCount * sharePrice) : 0;
+    budget !== null && sharePrice !== null && sharePrice > 0
+      ? Math.max(0, budget - shareCount * sharePrice)
+      : null;
 
   React.useEffect(() => {
-    if (!editingUpPct) setUpPctInput(String(upPct));
+    if (!editingUpPct) setUpPctInput(upPct === null ? "" : String(upPct));
   }, [upPct, editingUpPct]);
 
   React.useEffect(() => {
-    if (!editingDownPct) setDownPctInput(String(downPct));
+    if (!editingDownPct) setDownPctInput(downPct === null ? "" : String(downPct));
   }, [downPct, editingDownPct]);
 
   React.useEffect(() => {
@@ -174,11 +205,9 @@ export function Calculator() {
           h("div", { className: "field__row" },
             h("span", { className: "prefix" }, "$"),
             h("input", {
-              type: "number",
+              ...numericInputProps,
               value: buyPriceInput,
-              min: 0,
-              step: "0.01",
-              onChange: (e) => setBuyPriceInput(e.target.value),
+              onChange: (e) => updateNumericInput(setBuyPriceInput)(e.target.value),
             })
           )
       ),
@@ -194,10 +223,14 @@ export function Calculator() {
             onPctFocus: () => setEditingUpPct(true),
             onPctBlur: () => {
               setEditingUpPct(false);
-              setUpPctInput(String(upPct));
+              setUpPctInput(upPct === null ? "" : String(upPct));
             },
             onChangePrice: (price) => {
-              if (buyPrice <= 0) return;
+              if (price === null) {
+                setUpPct(null);
+                return;
+              }
+              if (buyPrice === null || buyPrice <= 0) return;
               const pct = ((price / buyPrice) - 1) * 100;
               setUpPct(clampPct(pct));
             },
@@ -219,10 +252,14 @@ export function Calculator() {
             onPctFocus: () => setEditingDownPct(true),
             onPctBlur: () => {
               setEditingDownPct(false);
-              setDownPctInput(String(downPct));
+              setDownPctInput(downPct === null ? "" : String(downPct));
             },
             onChangePrice: (price) => {
-              if (buyPrice <= 0) return;
+              if (price === null) {
+                setDownPct(null);
+                return;
+              }
+              if (buyPrice === null || buyPrice <= 0) return;
               const pct = ((buyPrice - price) / buyPrice) * 100;
               setDownPct(clampPct(pct));
             },
@@ -256,11 +293,9 @@ export function Calculator() {
             h("div", { className: "field__row" },
               h("span", { className: "prefix" }, "$"),
               h("input", {
-                type: "number",
+                ...numericInputProps,
                 value: budgetInput,
-                min: 0,
-                step: "0.01",
-                onChange: (e) => setBudgetInput(e.target.value),
+                onChange: (e) => updateNumericInput(setBudgetInput)(e.target.value),
               })
             )
           ),
@@ -271,11 +306,9 @@ export function Calculator() {
             h("div", { className: "field__row" },
               h("span", { className: "prefix" }, "$"),
               h("input", {
-                type: "number",
+                ...numericInputProps,
                 value: sharePriceInput,
-                min: 0,
-                step: "0.01",
-                onChange: (e) => setSharePriceInput(e.target.value),
+                onChange: (e) => updateNumericInput(setSharePriceInput)(e.target.value),
               })
             )
           )
@@ -287,14 +320,14 @@ export function Calculator() {
             "div",
             { className: "result-card" },
             h("p", { className: "label" }, "可买股数"),
-            h("div", { className: "metric--lg" }, `${shareCount}`),
+            h("div", { className: "metric--lg" }, shareCount === null ? "--" : `${shareCount}`),
             h("p", { className: "muted" }, "按整数股数估算")
           ),
           h(
             "div",
             { className: "result-card" },
             h("p", { className: "label" }, "剩余资金"),
-            h("div", { className: "metric--lg" }, `$${formatCurrency(remainingCash)}`),
+            h("div", { className: "metric--lg" }, formatCurrencyValue(remainingCash)),
             h("p", { className: "muted" }, "金额 - 股数 × 股价")
           )
         )
@@ -318,11 +351,9 @@ export function Calculator() {
             h("div", { className: "field__row" },
               h("span", { className: "prefix" }, "$"),
               h("input", {
-                type: "number",
+                ...numericInputProps,
                 value: strikeInput,
-                min: 0,
-                step: "0.5",
-                onChange: (e) => setStrikeInput(e.target.value),
+                onChange: (e) => updateNumericInput(setStrikeInput)(e.target.value),
               })
             )
           ),
@@ -333,11 +364,9 @@ export function Calculator() {
             h("div", { className: "field__row" },
               h("span", { className: "prefix" }, "$"),
               h("input", {
-                type: "number",
+                ...numericInputProps,
                 value: premiumInput,
-                min: 0,
-                step: "0.1",
-                onChange: (e) => setPremiumInput(e.target.value),
+                onChange: (e) => updateNumericInput(setPremiumInput)(e.target.value),
               })
             )
           )
@@ -349,11 +378,9 @@ export function Calculator() {
           h("div", { className: "field__row" },
             h("span", { className: "prefix" }, "#"),
             h("input", {
-              type: "number",
+              ...numericInputProps,
               value: contractsInput,
-              min: 1,
-              step: "1",
-              onChange: (e) => setContractsInput(e.target.value),
+              onChange: (e) => updateNumericInput(setContractsInput)(e.target.value),
             })
           )
         ),
@@ -364,21 +391,21 @@ export function Calculator() {
             "div",
             { className: "result-card" },
             h("p", { className: "label" }, "实际成交均价（行权后）"),
-            h("div", { className: "metric--lg" }, `$${formatCurrency(netCostPerShare)}`),
+            h("div", { className: "metric--lg" }, formatCurrencyValue(netCostPerShare)),
             h("p", { className: "muted" }, "行权价 - 权利金")
           ),
           h(
             "div",
             { className: "result-card" },
             h("p", { className: "label" }, "收到权利金"),
-            h("div", { className: "metric--lg" }, `$${formatCurrency(premiumTotal)}`),
-            h("p", { className: "muted" }, `${contracts} 张 · 100 股/张`)
+            h("div", { className: "metric--lg" }, formatCurrencyValue(premiumTotal)),
+            h("p", { className: "muted" }, `${contracts === null ? "--" : contracts} 张 · 100 股/张`)
           ),
           h(
             "div",
             { className: "result-card" },
             h("p", { className: "label" }, "若被指派需备资金"),
-            h("div", { className: "metric--lg" }, `$${formatCurrency(assignmentCost)}`),
+            h("div", { className: "metric--lg" }, formatCurrencyValue(assignmentCost)),
             h("p", { className: "muted" }, "净成本 × 100 股 × 张数")
           )
         )
