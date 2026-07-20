@@ -3,6 +3,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   Calculator,
+  calculateSellPutAnnualizedYield,
   normalizeNumericInput,
   parseNumericInput,
 } from "./calculator.js";
@@ -37,5 +38,38 @@ describe("Calculator numeric inputs", () => {
     expect(parseNumericInput(".5")).toBe(0.5);
     expect(parseNumericInput("")).toBeNull();
     expect(parseNumericInput(".")).toBeNull();
+  });
+
+  test("renders preset budget buttons and expiration based annualized yield fields", () => {
+    const html = renderToStaticMarkup(React.createElement(Calculator));
+
+    expect(html).toContain("10000");
+    expect(html).toContain("20000");
+    expect(html).toContain("50000");
+    expect(html).toContain("到期日");
+    expect(html).toContain("年化收益");
+    expect(html).toContain("按行权价占用资金年化");
+  });
+
+  test("annualizes sell put premium by occupied strike capital and days to expiration", () => {
+    expect(
+      calculateSellPutAnnualizedYield({
+        strike: 60,
+        premium: 7,
+        contracts: 2,
+        expirationDate: "2026-08-20",
+        currentDate: new Date(2026, 6, 21),
+      })
+    ).toBeCloseTo(1.419444, 6);
+
+    expect(
+      calculateSellPutAnnualizedYield({
+        strike: 0,
+        premium: 7,
+        contracts: 2,
+        expirationDate: "2026-08-20",
+        currentDate: new Date(2026, 6, 21),
+      })
+    ).toBeNull();
   });
 });

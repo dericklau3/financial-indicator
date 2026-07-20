@@ -13,9 +13,16 @@ const formatCurrencyValue = (value) => {
   return `$${formatCurrency(value)}`;
 };
 
+const formatPercentValue = (value) => {
+  if (!Number.isFinite(value)) return "--";
+  return formatPct(value * 100, 2);
+};
+
 const clampPct = (val) => Math.max(0, Math.min(300, val));
 
 const NUMERIC_INPUT_RE = /^\d*(?:\.\d*)?$/;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const BUDGET_PRESETS = ["10000", "20000", "50000"];
 
 export const normalizeNumericInput = (nextValue, previousValue = "") => {
   if (NUMERIC_INPUT_RE.test(nextValue)) return nextValue;
@@ -36,6 +43,55 @@ const numericInputProps = {
 
 const updateNumericInput = (setter) => (nextValue) => {
   setter((previousValue) => normalizeNumericInput(nextValue, previousValue));
+};
+
+const parseDateInput = (value) => {
+  if (!value) return null;
+  const parts = value.split("-").map((part) => Number(part));
+  if (parts.length !== 3 || parts.some((part) => !Number.isInteger(part))) return null;
+  const [year, month, day] = parts;
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  return date;
+};
+
+export const calculateSellPutAnnualizedYield = ({
+  strike,
+  premium,
+  contracts,
+  expirationDate,
+  currentDate = new Date(),
+}) => {
+  const expiration = parseDateInput(expirationDate);
+  if (
+    !expiration ||
+    !Number.isFinite(strike) ||
+    !Number.isFinite(premium) ||
+    !Number.isFinite(contracts) ||
+    strike <= 0 ||
+    premium < 0 ||
+    contracts <= 0
+  ) {
+    return null;
+  }
+
+  const currentDay = new Date(
+    currentDate.getFullYear(),
+    currentDate.getMonth(),
+    currentDate.getDate()
+  );
+  const daysToExpiration = Math.ceil((expiration.getTime() - currentDay.getTime()) / MS_PER_DAY);
+  if (daysToExpiration <= 0) return null;
+
+  const premiumTotal = premium * 100 * contracts;
+  const occupiedCapital = strike * 100 * contracts;
+  return (premiumTotal / occupiedCapital / daysToExpiration) * 365;
 };
 
 const PctRow = ({
@@ -124,6 +180,7 @@ export function Calculator() {
   const [contractsInput, setContractsInput] = React.useState("");
   const [budgetInput, setBudgetInput] = React.useState("");
   const [sharePriceInput, setSharePriceInput] = React.useState("");
+  const [expirationInput, setExpirationInput] = React.useState("");
 
   const buyPrice = parseNumericInput(buyPriceInput);
   const strike = parseNumericInput(strikeInput);
@@ -143,10 +200,16 @@ export function Calculator() {
     strike !== null && premium !== null ? strike - premium : null;
   const premiumTotal =
     premium !== null && contracts !== null ? premium * 100 * contractsForCalculation : null;
-  const assignmentCost =
-    netCostPerShare !== null && contracts !== null
-      ? netCostPerShare * 100 * contractsForCalculation
+  const occupiedCapital =
+    strike !== null && contracts !== null
+      ? strike * 100 * contractsForCalculation
       : null;
+  const annualizedYield = calculateSellPutAnnualizedYield({
+    strike,
+    premium,
+    contracts,
+    expirationDate: expirationInput,
+  });
   const shareCount =
     budget !== null && sharePrice !== null && sharePrice > 0
       ? Math.max(0, Math.floor(budget / sharePrice))
@@ -315,6 +378,22 @@ export function Calculator() {
         ),
         h(
           "div",
+          { className: "preset-buttons", "aria-label": "投入金额快捷选择" },
+          BUDGET_PRESETS.map((preset) =>
+            h(
+              "button",
+              {
+                key: preset,
+                type: "button",
+                className: "preset-button",
+                onClick: () => setBudgetInput(preset),
+              },
+              preset
+            )
+          )
+        ),
+        h(
+          "div",
           { className: "result-cards" },
           h(
             "div",
@@ -373,14 +452,28 @@ export function Calculator() {
         ),
         h(
           "div",
-          { className: "field" },
-          h("label", null, "合约张数"),
-          h("div", { className: "field__row" },
-            h("span", { className: "prefix" }, "#"),
+          { className: "double-field" },
+          h(
+            "div",
+            { className: "field" },
+            h("label", null, "合约张数"),
+            h("div", { className: "field__row" },
+              h("span", { className: "prefix" }, "#"),
+              h("input", {
+                ...numericInputProps,
+                value: contractsInput,
+                onChange: (e) => updateNumericInput(setContractsInput)(e.target.value),
+              })
+            )
+          ),
+          h(
+            "div",
+            { className: "field" },
+            h("label", null, "到期日"),
             h("input", {
-              ...numericInputProps,
-              value: contractsInput,
-              onChange: (e) => updateNumericInput(setContractsInput)(e.target.value),
+              type: "date",
+              value: expirationInput,
+              onChange: (e) => setExpirationInput(e.target.value),
             })
           )
         ),
@@ -404,9 +497,16 @@ export function Calculator() {
           h(
             "div",
             { className: "result-card" },
-            h("p", { className: "label" }, "若被指派需备资金"),
-            h("div", { className: "metric--lg" }, formatCurrencyValue(assignmentCost)),
-            h("p", { className: "muted" }, "净成本 × 100 股 × 张数")
+            h("p", { className: "label" }, "占用资金"),
+            h("div", { className: "metric--lg" }, formatCurrencyValue(occupiedCapital)),
+            h("p", { className: "muted" }, "行权价 × 100 股 × 张数")
+          ),
+          h(
+            "div",
+            { className: "result-card" },
+            h("p", { className: "label" }, "年化收益"),
+            h("div", { className: "metric--lg" }, formatPercentValue(annualizedYield)),
+            h("p", { className: "muted" }, "按行权价占用资金年化")
           )
         )
       )
