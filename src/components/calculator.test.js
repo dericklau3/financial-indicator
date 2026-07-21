@@ -26,11 +26,22 @@ describe("Calculator numeric inputs", () => {
     expect(html).not.toContain(">0 张");
   });
 
+  test("does not use browser numeric patterns that block decimal editing", () => {
+    const html = renderToStaticMarkup(React.createElement(Calculator));
+
+    expect(html).not.toContain("pattern=");
+  });
+
   test("keeps decimal editing states while rejecting invalid characters", () => {
     expect(normalizeNumericInput("12.")).toBe("12.");
     expect(normalizeNumericInput(".5")).toBe(".5");
     expect(normalizeNumericInput("")).toBe("");
-    expect(normalizeNumericInput("12..3", "12.")).toBe("12.");
+    expect(normalizeNumericInput("12..3", "12.")).toBe("12.3");
+    expect(normalizeNumericInput("12.3.", "12.3")).toBe("123.");
+    expect(normalizeNumericInput("12..3", "12.3")).toBe("12.3");
+    expect(normalizeNumericInput("12。", "12")).toBe("12.");
+    expect(normalizeNumericInput("12．3", "12")).toBe("12.3");
+    expect(normalizeNumericInput("12,3", "12")).toBe("12.3");
     expect(normalizeNumericInput("abc", "")).toBe("");
   });
 

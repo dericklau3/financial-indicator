@@ -21,12 +21,36 @@ const formatPercentValue = (value) => {
 const clampPct = (val) => Math.max(0, Math.min(300, val));
 
 const NUMERIC_INPUT_RE = /^\d*(?:\.\d*)?$/;
+const NUMERIC_EDIT_INPUT_RE = /^[\d.]*$/;
+const DECIMAL_SEPARATOR_RE = /[。．，,]/g;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const BUDGET_PRESETS = ["10000", "20000", "50000"];
 
 export const normalizeNumericInput = (nextValue, previousValue = "") => {
-  if (NUMERIC_INPUT_RE.test(nextValue)) return nextValue;
-  return previousValue;
+  const normalizedValue = nextValue.replace(DECIMAL_SEPARATOR_RE, ".");
+  const normalizedPreviousValue = previousValue.replace(DECIMAL_SEPARATOR_RE, ".");
+
+  if (NUMERIC_INPUT_RE.test(normalizedValue)) return normalizedValue;
+  if (!NUMERIC_EDIT_INPUT_RE.test(normalizedValue)) return normalizedPreviousValue;
+
+  const dotCount = [...normalizedValue].filter((char) => char === ".").length;
+  const previousDotCount = [...normalizedPreviousValue].filter((char) => char === ".").length;
+  if (dotCount <= 1 || previousDotCount === 0) return normalizedPreviousValue;
+
+  let insertedDotIndex = normalizedValue.lastIndexOf(".");
+  for (let index = 0; index < normalizedValue.length; index += 1) {
+    if (normalizedValue[index] !== normalizedPreviousValue[index]) {
+      insertedDotIndex = index;
+      break;
+    }
+  }
+
+  const digitCountBeforeInsertedDot = normalizedValue
+    .slice(0, insertedDotIndex)
+    .replaceAll(".", "")
+    .length;
+  const digits = normalizedValue.replaceAll(".", "");
+  return `${digits.slice(0, digitCountBeforeInsertedDot)}.${digits.slice(digitCountBeforeInsertedDot)}`;
 };
 
 export const parseNumericInput = (value) => {
@@ -38,7 +62,6 @@ export const parseNumericInput = (value) => {
 const numericInputProps = {
   type: "text",
   inputMode: "decimal",
-  pattern: "[0-9]*[.]?[0-9]*",
 };
 
 const updateNumericInput = (setter) => (nextValue) => {
