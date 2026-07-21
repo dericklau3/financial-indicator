@@ -3,6 +3,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   Calculator,
+  calculateActualCashRequired,
   calculateSellPutAnnualizedYield,
   normalizeNumericInput,
   parseNumericInput,
@@ -71,5 +72,23 @@ describe("Calculator numeric inputs", () => {
         currentDate: new Date(2026, 6, 21),
       })
     ).toBeNull();
+  });
+
+  test("calculates actual cash required after applying received premium", () => {
+    expect(
+      calculateActualCashRequired({
+        strike: 60,
+        premium: 12.5,
+        contracts: 4,
+      })
+    ).toBe(19000);
+
+    expect(
+      calculateActualCashRequired({
+        strike: 60,
+        premium: 70,
+        contracts: 4,
+      })
+    ).toBe(0);
   });
 });

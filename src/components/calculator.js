@@ -94,6 +94,23 @@ export const calculateSellPutAnnualizedYield = ({
   return (premiumTotal / occupiedCapital / daysToExpiration) * 365;
 };
 
+export const calculateActualCashRequired = ({ strike, premium, contracts }) => {
+  if (
+    !Number.isFinite(strike) ||
+    !Number.isFinite(premium) ||
+    !Number.isFinite(contracts) ||
+    strike <= 0 ||
+    premium < 0 ||
+    contracts <= 0
+  ) {
+    return null;
+  }
+
+  const occupiedCapital = strike * 100 * contracts;
+  const premiumTotal = premium * 100 * contracts;
+  return Math.max(0, occupiedCapital - premiumTotal);
+};
+
 const PctRow = ({
   label,
   value,
@@ -204,6 +221,11 @@ export function Calculator() {
     strike !== null && contracts !== null
       ? strike * 100 * contractsForCalculation
       : null;
+  const actualCashRequired = calculateActualCashRequired({
+    strike,
+    premium,
+    contracts,
+  });
   const annualizedYield = calculateSellPutAnnualizedYield({
     strike,
     premium,
@@ -500,6 +522,13 @@ export function Calculator() {
             h("p", { className: "label" }, "占用资金"),
             h("div", { className: "metric--lg" }, formatCurrencyValue(occupiedCapital)),
             h("p", { className: "muted" }, "行权价 × 100 股 × 张数")
+          ),
+          h(
+            "div",
+            { className: "result-card" },
+            h("p", { className: "label" }, "实际出资资金"),
+            h("div", { className: "metric--lg" }, formatCurrencyValue(actualCashRequired)),
+            h("p", { className: "muted" }, "占用资金 - 已收权利金")
           ),
           h(
             "div",
