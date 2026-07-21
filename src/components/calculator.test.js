@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   Calculator,
   calculateActualCashRequired,
+  calculateSellPutPremiumYield,
   calculateSellPutAnnualizedYield,
   normalizeNumericInput,
   parseNumericInput,
@@ -59,8 +60,28 @@ describe("Calculator numeric inputs", () => {
     expect(html).toContain("20000");
     expect(html).toContain("50000");
     expect(html).toContain("到期日");
+    expect(html).toContain("权利金收益率");
+    expect(html).toContain("收到权利金 ÷ 占用资金");
     expect(html).toContain("年化收益");
     expect(html).toContain("按行权价占用资金年化");
+  });
+
+  test("calculates sell put premium yield against occupied strike capital", () => {
+    expect(
+      calculateSellPutPremiumYield({
+        strike: 60,
+        premium: 12,
+        contracts: 4,
+      })
+    ).toBeCloseTo(0.2, 6);
+
+    expect(
+      calculateSellPutPremiumYield({
+        strike: 0,
+        premium: 12,
+        contracts: 4,
+      })
+    ).toBeNull();
   });
 
   test("annualizes sell put premium by occupied strike capital and days to expiration", () => {

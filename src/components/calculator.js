@@ -117,6 +117,23 @@ export const calculateSellPutAnnualizedYield = ({
   return (premiumTotal / occupiedCapital / daysToExpiration) * 365;
 };
 
+export const calculateSellPutPremiumYield = ({ strike, premium, contracts }) => {
+  if (
+    !Number.isFinite(strike) ||
+    !Number.isFinite(premium) ||
+    !Number.isFinite(contracts) ||
+    strike <= 0 ||
+    premium < 0 ||
+    contracts <= 0
+  ) {
+    return null;
+  }
+
+  const premiumTotal = premium * 100 * contracts;
+  const occupiedCapital = strike * 100 * contracts;
+  return premiumTotal / occupiedCapital;
+};
+
 export const calculateActualCashRequired = ({ strike, premium, contracts }) => {
   if (
     !Number.isFinite(strike) ||
@@ -245,6 +262,11 @@ export function Calculator() {
       ? strike * 100 * contractsForCalculation
       : null;
   const actualCashRequired = calculateActualCashRequired({
+    strike,
+    premium,
+    contracts,
+  });
+  const premiumYield = calculateSellPutPremiumYield({
     strike,
     premium,
     contracts,
@@ -552,6 +574,13 @@ export function Calculator() {
             h("p", { className: "label" }, "实际出资资金"),
             h("div", { className: "metric--lg" }, formatCurrencyValue(actualCashRequired)),
             h("p", { className: "muted" }, "占用资金 - 已收权利金")
+          ),
+          h(
+            "div",
+            { className: "result-card" },
+            h("p", { className: "label" }, "权利金收益率"),
+            h("div", { className: "metric--lg" }, formatPercentValue(premiumYield)),
+            h("p", { className: "muted" }, "收到权利金 ÷ 占用资金")
           ),
           h(
             "div",
