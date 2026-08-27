@@ -13,6 +13,15 @@ const formatCurrencyValue = (value) => {
   return `$${formatCurrency(value)}`;
 };
 
+export const formatTargetPriceInput = (value) => {
+  if (!Number.isFinite(value)) return "";
+  if (Math.abs(value) >= 0.01) return value.toFixed(2);
+  return value
+    .toFixed(9)
+    .replace(/(\.\d*?)0+$/, "$1")
+    .replace(/\.$/, "");
+};
+
 const formatPercentValue = (value) => {
   if (!Number.isFinite(value)) return "--";
   return formatPct(value * 100, 2);
@@ -295,11 +304,11 @@ export function Calculator() {
   }, [downPct, editingDownPct]);
 
   React.useEffect(() => {
-    if (!editingUpPrice) setUpPriceInput(Number.isFinite(upPrice) ? upPrice.toFixed(2) : "");
+    if (!editingUpPrice) setUpPriceInput(formatTargetPriceInput(upPrice));
   }, [upPrice, editingUpPrice]);
 
   React.useEffect(() => {
-    if (!editingDownPrice) setDownPriceInput(Number.isFinite(downPrice) ? downPrice.toFixed(2) : "");
+    if (!editingDownPrice) setDownPriceInput(formatTargetPriceInput(downPrice));
   }, [downPrice, editingDownPrice]);
 
   return h(
@@ -369,7 +378,7 @@ export function Calculator() {
             onPriceFocus: () => setEditingUpPrice(true),
             onPriceBlur: () => {
               setEditingUpPrice(false);
-              setUpPriceInput(Number.isFinite(upPrice) ? upPrice.toFixed(2) : "");
+              setUpPriceInput(formatTargetPriceInput(upPrice));
             },
             color: "var(--success)",
           }),
@@ -398,7 +407,7 @@ export function Calculator() {
             onPriceFocus: () => setEditingDownPrice(true),
             onPriceBlur: () => {
               setEditingDownPrice(false);
-              setDownPriceInput(Number.isFinite(downPrice) ? downPrice.toFixed(2) : "");
+              setDownPriceInput(formatTargetPriceInput(downPrice));
             },
             color: "var(--danger)",
           })

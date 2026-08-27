@@ -217,6 +217,14 @@ describe("supabase dashboard data helpers", () => {
               display_order: 1,
               is_active: true,
             },
+            {
+              slug: "lilu",
+              name: "李录",
+              description: "Himalaya Capital 持仓",
+              url: "https://www.dataroma.com/m/holdings.php?m=HC",
+              display_order: 7,
+              is_active: true,
+            },
           ];
         },
       };
@@ -233,6 +241,12 @@ describe("supabase dashboard data helpers", () => {
         name: "段永平",
         desc: "H&H Holdings 持仓",
         url: "https://www.dataroma.com/m/holdings.php?m=HH",
+      },
+      {
+        id: "lilu",
+        name: "李录",
+        desc: "Himalaya Capital 持仓",
+        url: "https://www.dataroma.com/m/holdings.php?m=HC",
       },
     ]);
     expect(calls).toHaveLength(1);

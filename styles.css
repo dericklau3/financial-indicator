@@ -915,7 +915,7 @@ input[type="number"] {
 
 .pct-row {
   display: grid;
-  grid-template-columns: 180px 1fr 180px;
+  grid-template-columns: minmax(120px, 0.7fr) minmax(140px, 0.8fr) minmax(240px, 1.2fr);
   gap: 12px;
   align-items: center;
 }
@@ -935,6 +935,7 @@ input[type="number"] {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
   padding: 10px 12px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.04);
@@ -944,13 +945,14 @@ input[type="number"] {
 
 .result-chip__input {
   display: grid;
-  grid-template-columns: 46px 1fr;
+  grid-template-columns: 46px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
 }
 
 .result-chip__input input {
   height: 34px;
+  min-width: 0;
   padding: 0 10px;
   font-weight: 700;
 }

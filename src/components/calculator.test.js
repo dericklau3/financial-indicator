@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
@@ -6,6 +7,7 @@ import {
   calculateActualCashRequired,
   calculateSellPutPremiumYield,
   calculateSellPutAnnualizedYield,
+  formatTargetPriceInput,
   normalizeNumericInput,
   parseNumericInput,
 } from "./calculator.js";
@@ -33,6 +35,13 @@ describe("Calculator numeric inputs", () => {
     expect(html).not.toContain("pattern=");
   });
 
+  test("reserves enough desktop width for tiny target price inputs", () => {
+    const css = readFileSync("styles.css", "utf8");
+
+    expect(css).toContain("minmax(240px, 1.2fr)");
+    expect(css).toContain("grid-template-columns: 38px minmax(0, 1fr)");
+  });
+
   test("keeps decimal editing states while rejecting invalid characters", () => {
     expect(normalizeNumericInput("12.")).toBe("12.");
     expect(normalizeNumericInput(".5")).toBe(".5");
@@ -51,6 +60,12 @@ describe("Calculator numeric inputs", () => {
     expect(parseNumericInput(".5")).toBe(0.5);
     expect(parseNumericInput("")).toBeNull();
     expect(parseNumericInput(".")).toBeNull();
+  });
+
+  test("keeps tiny target prices visible instead of rounding them to zero", () => {
+    expect(formatTargetPriceInput(0.000000123)).toBe("0.000000123");
+    expect(formatTargetPriceInput(12.3456)).toBe("12.35");
+    expect(formatTargetPriceInput(null)).toBe("");
   });
 
   test("renders preset budget buttons and expiration based annualized yield fields", () => {
